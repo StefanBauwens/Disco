@@ -10,6 +10,7 @@
 #include "WebSocketClient.h"
 #include "libs/ArduinoJson.h"
 #include "time.h"
+#include "Passwords.h" //passwords, tokens & ids are defined here
 
 /*
  * All defines
@@ -27,17 +28,7 @@
 #define RAINBOW_DELAY_TIME 10
 //PUSHBUTTON DEFINES
 #define PUSHBUTTON_INPUT 13
-//WIFI DEFINES
-#define WIFI_SSID 
-#define WIFI_PASSWORD 
-//IMGUR DEFINES
-#define IMGUR_CLIENT_ID 
-#define IMGUR_CLIENT_SECRET 
-#define IMGUR_STEFAN_REFRESH_TOKEN 
-//DISCORD DEFINES
-#define BOT_TOKEN 
-#define APPLICATION_ID 
-#define GUILD_ID "814214232399937590"
+//DSCRD DEFINES
 #define GUILD_COMMAND_URL "/api/v8/applications/" APPLICATION_ID "/guilds/" GUILD_ID "/commands"
 #define GLOBAL_COMMAND_URL "/api/v8/applications/" APPLICATION_ID "/commands"
 #define INTERACTION_URL_A "/api/v8/interactions/"
