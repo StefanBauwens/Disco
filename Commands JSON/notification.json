@@ -1,0 +1,48 @@
+{
+   "name": "notification",
+   "description": "Send a notification to Disco",
+   "options": 
+   [      
+      {
+         "name": "message",
+         "description": "Your notification message",
+         "type": 3,
+         "required": true
+      },      
+      {
+         "name": "ledmode",
+         "description": "The led mode to be in while your notification is displayed",
+         "type": 4,
+         "required": true,
+         "choices":
+         [
+            {
+                "name": "Rainbow",
+                "value": 0;
+            },
+            {
+                "name": "Gentle flash",
+                "value": 1;
+            },
+            {
+                "name": "Fast flash",
+                "value": 2;
+            },
+            {
+                "name": "Fixed color",
+                "value": 3;
+            },
+            {
+                "name": "Off",
+                "value": 4;
+            },
+         ]
+      },
+      {
+          "name": "ledcolor",
+          "description": "The hex color to use for the led if using a flash or fixed color ledmode",
+          "type": 3,
+          "required" : false
+      }
+   ]
+}
