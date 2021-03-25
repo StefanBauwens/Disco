@@ -48,8 +48,8 @@
 #define ARROW_ICON_STR "~"
 #define NOTIFICATION_ICON_COUNT 3
 #define STANDARD_NOTIFICATION_COLOR "FF0000" //red
-//MODE DEFINES //0 = clock //1 = note //2 = stock //3 = timer //4 = animation 
-#define DEFAULT_MODE 0
+//MODE DEFINES //0 = clock //1 = note //2 = stock //3 = timer //4 = animation //5 = 3D
+#define DEFAULT_MODE 5 
 //CLOCK
 #define CLOCK_UPDATE_TIME 5000 //every 5 seconds for now
 #define CITY_COUNTRY "Boechout, Belgium"
@@ -68,6 +68,22 @@
 #define DEFAULT_FRAME_DELAY 1000
 #define DEFAULT_FRAME_ONE "++++++++++++++++++++++++++++++++"
 #define DEFAULT_FRAME_TWO "--------------------------------"
+
+/*
+ * Structs
+ */
+struct vector2
+{
+    int x;
+    int y;
+};
+
+struct vector3
+{
+    float x;
+    float y;
+    float z;
+};
 
 /*
  * Define methods
@@ -110,12 +126,17 @@ String lcdSubstring(String unformattedStr, int from, int to); //bit abstract but
 String lcdFormat(String unformattedStr);
 String intToEscapeCharacter(int digit);
 int intArrayContains(int intArray[], int value);
-
-//void generateBitmapImage();
 void generateBitmapImage (byte* imageData, int width, int height, int resizeFactor, bool useGreenTable);
 unsigned char* createBitmapFileHeader(int height, int stride);
 unsigned char* createBitmapInfoHeader(int height, int width);
 void getImgurAccessToken();
+void bufferToScreen();
+void handle3D();
+void clearBuffer();
+void setPixel(int x, int y);
+void setLine(int x0, int y0, int x1, int y1);
+vector2 projectPoint(vector3 point);
+vector3 rotatePointAroundY(vector3 point, float angle);
 
 // Function to copy 'len' elements from 'src' to 'dst'
 void copy(const uint8_t* src, uint8_t* dst, int len) {
@@ -572,7 +593,6 @@ const char colorTableBlue[] = {
     0xF8,0x21,0x1E,0,
     0xEE,0xD6,0xB8,0
 };
-
 byte image[IMG_HEIGHT * (IMG_WIDTH/8)] = {B00001110, //used for character
                                           B00011011,
                                           B00011111,
@@ -604,6 +624,38 @@ const char *imgurHost = "api.imgur.com";
 String IMGUR_UPLOAD_ENDPOINT = "/3/image";
 String STEFAN_ACCESS_TOKEN = ""; //retrieved with refresh token
 
+//3D FIELDS
+byte screenBuffer[51] = {0,0,0,
+                         0,0,0,
+                         0,0,0,
+                         0,0,0,
+                         0,0,0,
+                         0,0,0,
+                         0,0,0,
+                         0,0,0,
+                         0,0,0,
+                         0,0,0,
+                         0,0,0,
+                         0,0,0,
+                         0,0,0,
+                         0,0,0,
+                         0,0,0,
+                         0,0,0,
+                         0,0,0}; //3 x 17 bytes wide as pixels are saved as bits --> 24 pixels wide x 17 high
+int xC = 0;
+int yC = 0;
+unsigned long timeSince3DUpdate = 0;
+int angle3D = 0;
+float projectPlaneDistance = 1; 
+vector3 p1 = {-10, -10, 0.1};
+vector3 p2 = {-10, -10, 11};
+vector3 p3 = {10, -10, 11};
+vector3 p4 = {10, -10, 0.1};
+vector3 p5 = {-10, 10, 0.1};
+vector3 p6 = {-10, 10, 11};
+vector3 p7 = {10, 10, 11};
+vector3 p8 = {10, 10, 0.1};
+                          
 /*
  * Wifi & Discord related Methods
  */
@@ -967,7 +1019,7 @@ void handleCommand()
         //reverse chosen character
         for (int i = 0; i < 8; i++)
         {
-            image[7-i] = customChars[8*(slotNr-1) + i];
+            image[7-i] = customChars[8*(slotNr-1) + i] << 2;
         }
         //generate bitmap file
         generateBitmapImage(image, 8, 8, 4, useGreenTable); //we use a mutliple of 8 as we're working with pure bits. Resize factor = 4
@@ -1389,6 +1441,9 @@ void handleMode()
         case 4: //Animation mode
             handleAnimation();
             break;
+        case 5: //3D mode
+            handle3D();
+            break;
     }   
 }
 
@@ -1607,6 +1662,246 @@ void handleAnimation()
         currentFrame = (currentFrame+1)%frameCount;
     }
 }
+
+//3D
+void handle3D()
+{
+    if(millis() - timeSince3DUpdate >= 200) 
+    {
+        clearBuffer();
+        timeSince3DUpdate = millis();
+        /*
+        setPixel(xC, yC);
+        xC++;
+        if(xC == 24)
+        {
+            yC++;
+            if(yC == 17)
+            {
+                yC = 0;
+                clearBuffer();
+            }
+            xC=0;
+        }*/
+        
+        //projected points
+        vector2 pp1 = projectPoint(p1);
+        Serial.print("Original point: ");
+        Serial.print(p1.x);
+        Serial.print(", ");
+        Serial.print(p1.y);
+        Serial.print(", ");
+        Serial.print(p1.z);
+        Serial.print(" Projected point: ");
+        Serial.print(pp1.x);
+        Serial.print(", ");
+        Serial.println(pp1.y);
+
+        vector2 pp2 = projectPoint(p2);
+        vector2 pp3 = projectPoint(p3);
+        vector2 pp4 = projectPoint(p4);
+        vector2 pp5 = projectPoint(p5);
+        vector2 pp6 = projectPoint(p6);
+        vector2 pp7 = projectPoint(p7);
+        vector2 pp8 = projectPoint(p8);
+     
+        setLine(pp1.x, pp1.y, pp2.x, pp2.y);
+        setLine(pp2.x, pp2.y, pp3.x, pp3.y);
+        setLine(pp3.x, pp3.y, pp4.x, pp4.y);
+        setLine(pp4.x, pp4.y, pp1.x, pp1.y);
+        
+        setLine(pp5.x, pp5.y, pp6.x, pp6.y);
+        setLine(pp6.x, pp6.y, pp7.x, pp7.y);
+        setLine(pp7.x, pp7.y, pp8.x, pp8.y);
+        setLine(pp8.x, pp8.y, pp5.x, pp5.y);
+
+        setLine(pp1.x, pp1.y, pp5.x, pp5.y);
+        setLine(pp2.x, pp2.y, pp6.x, pp6.y);
+        setLine(pp3.x, pp3.y, pp7.x, pp7.y);
+        setLine(pp4.x, pp4.y, pp8.x, pp8.y);
+
+        p1 = rotatePointAroundY(p1, angle3D);
+        p2 = rotatePointAroundY(p2, angle3D);
+        p3 = rotatePointAroundY(p3, angle3D);
+        p4 = rotatePointAroundY(p4, angle3D);
+        p5 = rotatePointAroundY(p5, angle3D);
+        p6 = rotatePointAroundY(p6, angle3D);
+        p7 = rotatePointAroundY(p7, angle3D);
+        p8 = rotatePointAroundY(p8, angle3D);
+        angle3D += 1;
+        angle3D = angle3D%360;
+
+        /*setLine(0,0, 24, 17);
+        setLine(5,16, 20, 2);
+        setLine(0,0, 0, 17);
+        setLine(0,16, 24, 16);
+        setLine(22, 14, 0,0);*/
+        bufferToScreen();
+    }
+}
+
+vector2 projectPoint(vector3 point)
+{
+    return (vector2){(point.x * (projectPlaneDistance / point.z)) + 12, (point.y * (projectPlaneDistance / point.z)) + 8};
+}
+
+vector3 rotatePointAroundY(vector3 point, float angle) 
+{
+    angle = (angle * 71)/4068; //converts to rad
+    float newX = point.x * cos(angle) - point.z * sin(angle);
+    float newZ = point.x * sin(angle) + point.z * cos(angle);
+
+    return (vector3) { newX, point.y, newZ };
+}
+
+void clearBuffer()
+{
+    for (int i = 0; i < 51; i++)
+    {
+        screenBuffer[i] = 0;
+    }
+}
+
+void setPixel(int x, int y)
+{
+    if (x >= 0 && x < 24 && y >=0 && y < 17)
+    {
+        bitWrite(screenBuffer[(y * 3) + x/8], (7-x%8) ,1);
+    }
+}
+
+void setLine(int x0, int y0, int x1, int y1)
+{  
+    Serial.print("x0: ");
+    Serial.print(x0);
+    Serial.print(" y0: ");
+    Serial.print(y0);
+    Serial.print("x1: ");
+    Serial.print(x1);
+    Serial.print(" y1: ");
+    Serial.println(y1);
+    float x = x0;
+    float y = y0;
+    
+    float dx = x1 - x0;
+    float dy = y1 - y0;
+    
+    int dxSign = 1;
+    int dySign = 1;
+    if (x1 < x0)
+    {
+        dxSign = -1;
+    }
+    if (y1 < y0)
+    {
+        dySign = -1;
+    }
+    
+    //draw first pixel at origin
+    setPixel(x, y);
+    
+    if(x0 == x1) //vertical line
+    {
+        while ((int)y != y1)
+        {
+            y += dySign;
+            setPixel(x, y);
+        }
+    }
+    else if (y0 == y1) //horizontal line
+    {
+        while ((int)x != x1)
+        {
+            x += dxSign;
+            setPixel(x, y);
+        }
+    }
+    else //slope
+    {   
+        if (abs(dx) > abs(dy)) //iterate over x
+        {
+            while((int)x != x1)
+            {
+                x += dxSign;
+                y += (dy/dx) * dxSign;
+                setPixel(x, y);
+            }
+        }
+        else //iterate over y
+        {
+            while((int)y != y1)
+            {
+                y += dySign;
+                x += (dx/dy) * dySign;
+                setPixel(x, y);
+            }
+        }
+    }
+}
+
+void bufferToScreen() //buffer2screen uses customchars set at slots 44 to 51
+{
+    int slotNr = 44;
+    int iOffset = 0;
+    for (int i = 0; i < 2; i++)
+    {
+        customChars[(slotNr - 1)*8]     = screenBuffer[0 + iOffset]  >> 3;
+        customChars[(slotNr - 1)*8 + 1] = screenBuffer[3 + iOffset]  >> 3;
+        customChars[(slotNr - 1)*8 + 2] = screenBuffer[6 + iOffset]  >> 3;
+        customChars[(slotNr - 1)*8 + 3] = screenBuffer[9 + iOffset]  >> 3;
+        customChars[(slotNr - 1)*8 + 4] = screenBuffer[12 + iOffset] >> 3;
+        customChars[(slotNr - 1)*8 + 5] = screenBuffer[15 + iOffset] >> 3;
+        customChars[(slotNr - 1)*8 + 6] = screenBuffer[18 + iOffset] >> 3;
+        customChars[(slotNr - 1)*8 + 7] = screenBuffer[21 + iOffset] >> 3;
+        slotNr++;
+        
+        customChars[(slotNr - 1)*8]     = screenBuffer[0 + iOffset]  << 3 | screenBuffer[1 + iOffset]  >> 5;
+        customChars[(slotNr - 1)*8 + 1] = screenBuffer[3 + iOffset]  << 3 | screenBuffer[4 + iOffset]  >> 5;
+        customChars[(slotNr - 1)*8 + 2] = screenBuffer[6 + iOffset]  << 3 | screenBuffer[7 + iOffset]  >> 5;
+        customChars[(slotNr - 1)*8 + 3] = screenBuffer[9 + iOffset]  << 3 | screenBuffer[10 + iOffset] >> 5;
+        customChars[(slotNr - 1)*8 + 4] = screenBuffer[12 + iOffset] << 3 | screenBuffer[13 + iOffset] >> 5;
+        customChars[(slotNr - 1)*8 + 5] = screenBuffer[15 + iOffset] << 3 | screenBuffer[16 + iOffset] >> 5;
+        customChars[(slotNr - 1)*8 + 6] = screenBuffer[18 + iOffset] << 3 | screenBuffer[19 + iOffset] >> 5;
+        customChars[(slotNr - 1)*8 + 7] = screenBuffer[21 + iOffset] << 3 | screenBuffer[22 + iOffset] >> 5;
+        slotNr++;
+        
+        customChars[(slotNr - 1)*8]     = screenBuffer[1 + iOffset]  << 1 | screenBuffer[2 + iOffset]  >> 7;
+        customChars[(slotNr - 1)*8 + 1] = screenBuffer[4 + iOffset]  << 1 | screenBuffer[5 + iOffset]  >> 7;
+        customChars[(slotNr - 1)*8 + 2] = screenBuffer[7 + iOffset]  << 1 | screenBuffer[8 + iOffset]  >> 7;
+        customChars[(slotNr - 1)*8 + 3] = screenBuffer[10 + iOffset] << 1 | screenBuffer[11 + iOffset] >> 7;
+        customChars[(slotNr - 1)*8 + 4] = screenBuffer[13 + iOffset] << 1 | screenBuffer[14 + iOffset] >> 7;
+        customChars[(slotNr - 1)*8 + 5] = screenBuffer[16 + iOffset] << 1 | screenBuffer[17 + iOffset] >> 7;
+        customChars[(slotNr - 1)*8 + 6] = screenBuffer[19 + iOffset] << 1 | screenBuffer[20 + iOffset] >> 7;
+        customChars[(slotNr - 1)*8 + 7] = screenBuffer[22 + iOffset] << 1 | screenBuffer[23 + iOffset] >> 7;
+        slotNr++;
+    
+        customChars[(slotNr - 1)*8]     = screenBuffer[2 + iOffset]  >> 1;
+        customChars[(slotNr - 1)*8 + 1] = screenBuffer[5 + iOffset]  >> 1;
+        customChars[(slotNr - 1)*8 + 2] = screenBuffer[8 + iOffset]  >> 1;
+        customChars[(slotNr - 1)*8 + 3] = screenBuffer[11 + iOffset] >> 1;
+        customChars[(slotNr - 1)*8 + 4] = screenBuffer[14 + iOffset] >> 1;
+        customChars[(slotNr - 1)*8 + 5] = screenBuffer[17 + iOffset] >> 1;
+        customChars[(slotNr - 1)*8 + 6] = screenBuffer[20 + iOffset] >> 1;
+        customChars[(slotNr - 1)*8 + 7] = screenBuffer[23 + iOffset] >> 1;
+        slotNr++;
+        iOffset += 27;
+    }
+    customCharsUsed[0] = 0;
+    customCharsUsed[1] = 0;
+    customCharsUsed[2] = 0;
+    customCharsUsed[3] = 0;
+    customCharsUsed[4] = 0;
+    customCharsUsed[5] = 0;
+    customCharsUsed[6] = 0;
+    customChar = 1; //reset curstom character count
+    //customChar = 1;
+    //lcdClear(); //fixes it for now
+    lcdSetCursor(0,0);
+    lcdPrint("      ((44))((45))((46))((47))");
+    lcdSetCursor(0,1);
+    lcdPrint("      ((48))((49))((50))((51))");
+}
+
 
 int mod(int x, int m)
 {
