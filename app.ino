@@ -76,6 +76,12 @@ struct vector2
 {
     int x;
     int y;
+    
+    String toString()
+    {
+        String str = "{" + (String)x + "," + (String)y + "}";
+        return str;
+    }
 };
 
 struct vector3
@@ -83,6 +89,12 @@ struct vector3
     float x;
     float y;
     float z;
+
+    String toString()
+    {
+        String str = "{" + (String)x + "," + (String)y + "," + (String)z + "}";
+        return str;
+    }
 };
 
 /*
@@ -136,7 +148,9 @@ void clearBuffer();
 void setPixel(int x, int y);
 void setLine(int x0, int y0, int x1, int y1);
 vector2 projectPoint(vector3 point);
-vector3 rotatePointAroundY(vector3 point, float angle);
+vector3 rotatePointAroundY(vector3 point, float angle, vector3 pivotPoint);
+vector3 translatePoint(vector3 point, vector3 translation);
+vector3 multiplyVector3(vector3 vector, float multiplyFactor);
 
 // Function to copy 'len' elements from 'src' to 'dst'
 void copy(const uint8_t* src, uint8_t* dst, int len) {
@@ -647,14 +661,29 @@ int yC = 0;
 unsigned long timeSince3DUpdate = 0;
 int angle3D = 0;
 float projectPlaneDistance = 1; 
-vector3 p1 = {-10, -10, 0.1};
-vector3 p2 = {-10, -10, 11};
-vector3 p3 = {10, -10, 11};
-vector3 p4 = {10, -10, 0.1};
-vector3 p5 = {-10, 10, 0.1};
-vector3 p6 = {-10, 10, 11};
-vector3 p7 = {10, 10, 11};
-vector3 p8 = {10, 10, 0.1};
+/*vector3 p1 = {-0.71, -0.71, 1.29};
+vector3 p2 = {-0.71, 0.71, 1.29};
+vector3 p3 = {0.71, 0.71, 1.29};
+vector3 p4 = {0.71, -0.71, 1.29};
+vector3 p5 = {-0.71, -0.71, 2.71};
+vector3 p6 = {-0.71, 0.71, 2.71};
+vector3 p7 = {0.71, 0.71, 2.71};
+vector3 p8 = {0.71, -0.71, 2.71};*/
+vector3 p1 = {-1, -1, 1};
+vector3 p2 = {-1, 1, 1};
+vector3 p3 = {1, 1, 1};
+vector3 p4 = {1, -1, 1};
+vector3 p5 = {-1, -1, -1};
+vector3 p6 = {-1, 1, -1};
+vector3 p7 = {1, 1, -1};
+vector3 p8 = {1, -1, -1};
+vector3 pivot = {0, 0, 0};
+//eye distance to screen multiplied by zoom
+const float zNear = 15;
+const int screenWidth = 24;
+const int screenHeight = 17;
+const int wHalf = screenWidth/2;
+const int hHalf = screenHeight/2;
                           
 /*
  * Wifi & Discord related Methods
@@ -1666,7 +1695,7 @@ void handleAnimation()
 //3D
 void handle3D()
 {
-    if(millis() - timeSince3DUpdate >= 200) 
+    if(millis() - timeSince3DUpdate >= 100) 
     {
         clearBuffer();
         timeSince3DUpdate = millis();
@@ -1685,8 +1714,7 @@ void handle3D()
         }*/
         
         //projected points
-        vector2 pp1 = projectPoint(p1);
-        Serial.print("Original point: ");
+        /*Serial.print("Original point: ");
         Serial.print(p1.x);
         Serial.print(", ");
         Serial.print(p1.y);
@@ -1695,15 +1723,29 @@ void handle3D()
         Serial.print(" Projected point: ");
         Serial.print(pp1.x);
         Serial.print(", ");
-        Serial.println(pp1.y);
-
-        vector2 pp2 = projectPoint(p2);
-        vector2 pp3 = projectPoint(p3);
-        vector2 pp4 = projectPoint(p4);
-        vector2 pp5 = projectPoint(p5);
-        vector2 pp6 = projectPoint(p6);
-        vector2 pp7 = projectPoint(p7);
-        vector2 pp8 = projectPoint(p8);
+        Serial.println(pp1.y);*/
+        vector3 translation = {0,0,3}; //amount to move cube forward
+        vector3 translatedPivot = translatePoint(pivot, translation); //move cube pivot forward
+        //float m = 10; //multiplyfactor
+        //vector3 resizedPivot = multiplyVector3(pivot, m);
+        /*
+        vector2 pp1 = projectPoint(translatePoint(rotatePointAroundY(multiplyVector3(p1, m), angle3D, resizedPivot), translation));
+        vector2 pp2 = projectPoint(translatePoint(rotatePointAroundY(multiplyVector3(p2, m), angle3D, resizedPivot), translation));
+        vector2 pp3 = projectPoint(translatePoint(rotatePointAroundY(multiplyVector3(p3, m), angle3D, resizedPivot), translation));
+        vector2 pp4 = projectPoint(translatePoint(rotatePointAroundY(multiplyVector3(p4, m), angle3D, resizedPivot), translation));
+        vector2 pp5 = projectPoint(translatePoint(rotatePointAroundY(multiplyVector3(p5, m), angle3D, resizedPivot), translation));
+        vector2 pp6 = projectPoint(translatePoint(rotatePointAroundY(multiplyVector3(p6, m), angle3D, resizedPivot), translation));
+        vector2 pp7 = projectPoint(translatePoint(rotatePointAroundY(multiplyVector3(p7, m), angle3D, resizedPivot), translation));
+        vector2 pp8 = projectPoint(translatePoint(rotatePointAroundY(multiplyVector3(p8, m), angle3D, resizedPivot), translation));
+        */
+        vector2 pp1 = projectPoint(rotatePointAroundY(translatePoint(p1, translation), angle3D, translatedPivot));
+        vector2 pp2 = projectPoint(rotatePointAroundY(translatePoint(p2, translation), angle3D, translatedPivot));
+        vector2 pp3 = projectPoint(rotatePointAroundY(translatePoint(p3, translation), angle3D, translatedPivot));
+        vector2 pp4 = projectPoint(rotatePointAroundY(translatePoint(p4, translation), angle3D, translatedPivot));
+        vector2 pp5 = projectPoint(rotatePointAroundY(translatePoint(p5, translation), angle3D, translatedPivot));
+        vector2 pp6 = projectPoint(rotatePointAroundY(translatePoint(p6, translation), angle3D, translatedPivot));
+        vector2 pp7 = projectPoint(rotatePointAroundY(translatePoint(p7, translation), angle3D, translatedPivot));
+        vector2 pp8 = projectPoint(rotatePointAroundY(translatePoint(p8, translation), angle3D, translatedPivot));
      
         setLine(pp1.x, pp1.y, pp2.x, pp2.y);
         setLine(pp2.x, pp2.y, pp3.x, pp3.y);
@@ -1720,38 +1762,58 @@ void handle3D()
         setLine(pp3.x, pp3.y, pp7.x, pp7.y);
         setLine(pp4.x, pp4.y, pp8.x, pp8.y);
 
-        p1 = rotatePointAroundY(p1, angle3D);
-        p2 = rotatePointAroundY(p2, angle3D);
-        p3 = rotatePointAroundY(p3, angle3D);
-        p4 = rotatePointAroundY(p4, angle3D);
-        p5 = rotatePointAroundY(p5, angle3D);
-        p6 = rotatePointAroundY(p6, angle3D);
-        p7 = rotatePointAroundY(p7, angle3D);
-        p8 = rotatePointAroundY(p8, angle3D);
-        angle3D += 1;
+        angle3D += 10;
         angle3D = angle3D%360;
-
-        /*setLine(0,0, 24, 17);
-        setLine(5,16, 20, 2);
-        setLine(0,0, 0, 17);
-        setLine(0,16, 24, 16);
-        setLine(22, 14, 0,0);*/
         bufferToScreen();
     }
 }
 
 vector2 projectPoint(vector3 point)
 {
-    return (vector2){(point.x * (projectPlaneDistance / point.z)) + 12, (point.y * (projectPlaneDistance / point.z)) + 8};
+    if (abs(point.z) < 0.001f)
+    {
+        Serial.print("Vector3: ");
+        Serial.print(point.toString());
+        Serial.println(" projected point: {0,0}");
+        return (vector2){0,0};
+    }
+    vector2 pp = (vector2){(zNear * point.x)/point.z + wHalf, (zNear * point.y)/point.z + hHalf};
+    //vector2 pp = (vector2){(point.x * (projectPlaneDistance / point.z)) + 12, (point.y * (projectPlaneDistance / point.z)) + 8};
+    Serial.print("Vector3: ");
+    Serial.print(point.toString());
+    Serial.print(" projected point: ");
+    Serial.println(pp.toString());
+    return pp;
 }
 
-vector3 rotatePointAroundY(vector3 point, float angle) 
+vector3 rotatePointAroundY(vector3 point, float angle, vector3 pivotPoint) 
 {
-    angle = (angle * 71)/4068; //converts to rad
-    float newX = point.x * cos(angle) - point.z * sin(angle);
-    float newZ = point.x * sin(angle) + point.z * cos(angle);
+    //first translate point so it's around origin(0,0,0) instead of pivotPoint
+    vector3 newPoint = translatePoint(point, (vector3){-pivotPoint.x, -pivotPoint.y, -pivotPoint.z});
+    
+    angle *= 0.01745; //converts to rad
+    float newX = newPoint.x * cos(angle) - newPoint.z * sin(angle);
+    float newZ = newPoint.x * sin(angle) + newPoint.z * cos(angle);
+    
+    //retranslate point so it's around pivot
+    newPoint = translatePoint((vector3) { newX, newPoint.y, newZ }, pivotPoint);
+    return newPoint;//(vector3) { newX, point.y, newZ };
+}
 
-    return (vector3) { newX, point.y, newZ };
+vector3 translatePoint(vector3 point, vector3 translation)
+{
+    point.x += translation.x;
+    point.y += translation.y;
+    point.z += translation.z;
+    return point;
+}
+
+vector3 multiplyVector3(vector3 vector, float multiplyFactor)
+{
+    vector.x *= multiplyFactor;
+    vector.y *= multiplyFactor;
+    vector.z *= multiplyFactor;
+    return vector;
 }
 
 void clearBuffer()
@@ -1772,6 +1834,7 @@ void setPixel(int x, int y)
 
 void setLine(int x0, int y0, int x1, int y1)
 {  
+  /*
     Serial.print("x0: ");
     Serial.print(x0);
     Serial.print(" y0: ");
@@ -1779,7 +1842,7 @@ void setLine(int x0, int y0, int x1, int y1)
     Serial.print("x1: ");
     Serial.print(x1);
     Serial.print(" y1: ");
-    Serial.println(y1);
+    Serial.println(y1);*/
     float x = x0;
     float y = y0;
     
