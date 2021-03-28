@@ -49,7 +49,7 @@
 #define NOTIFICATION_ICON_COUNT 3
 #define STANDARD_NOTIFICATION_COLOR "FF0000" //red
 //MODE DEFINES //0 = clock //1 = note //2 = stock //3 = timer //4 = animation //5 = 3D
-#define DEFAULT_MODE 5 
+#define DEFAULT_MODE 0
 //CLOCK
 #define CLOCK_UPDATE_TIME 5000 //every 5 seconds for now
 #define CITY_COUNTRY "Boechout, Belgium"
@@ -95,6 +95,13 @@ struct vector3
         String str = "{" + (String)x + "," + (String)y + "," + (String)z + "}";
         return str;
     }
+};
+
+struct triangle
+{
+    int v1; //is the index (+1) of the vertice in the vertices array.
+    int v2;
+    int v3;
 };
 
 /*
@@ -151,6 +158,11 @@ vector2 projectPoint(vector3 point);
 vector3 rotatePointAroundY(vector3 point, float angle, vector3 pivotPoint);
 vector3 translatePoint(vector3 point, vector3 translation);
 vector3 multiplyVector3(vector3 vector, float multiplyFactor);
+bool parseObj(String objData);
+void drawFace(triangle tri);
+void draw3DLine(vector2 lineIndexes);
+vector3 parseVec3(String spaceSeperatedVector3, bool &success);
+void setup3D();
 
 // Function to copy 'len' elements from 'src' to 'dst'
 void copy(const uint8_t* src, uint8_t* dst, int len) {
@@ -222,10 +234,10 @@ byte customChars[440] = {0x0, 0x0, 0xa, 0x15,0x11,0xa, 0x4, 0x0, // ==((1)) empt
                          0x1c,0x1c,0xe, 0xe, 0xe, 0xc, 0x1c,0x18,//koijam pt2 ((48))
                          0x0, 0x0, 0xa, 0x0, 0x11,0xe, 0x0, 0x0, // ==((49)) happy smiley
                          0x0, 0x0, 0xa, 0x0, 0xe, 0x11,0x0, 0x0, // ==((50)) unhappy smiley
-                         0x0E,0x1B,0x11,0x11,0x00,0x1F,0x1B,0x0E,//system characters start here --> notification bell
+                         0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,//system characters start here --> empty used for 3D
                          0x0E,0x1B,0x1B,0x1B,0x1B,0x1F,0x1B,0x0E,//warning icon
                          0xe, 0x1f,0x15,0x17,0x11,0x1f,0xe, 0xe, //clock/watch icon
-                         0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, //placeholder
+                         0x0E,0x1B,0x11,0x11,0x00,0x1F,0x1B,0x0E, //notification bell
                          0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0  //placeholder
                          };
 byte virtualCGRAM[64] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, -0x1,  //copy of the cgram  8*8 = 64 //used for comparing if a character has already been saved
@@ -521,13 +533,14 @@ const String NOTIFICATION_CMD = "{\"name\":\"notification\",\"description\":\"Se
 const String SET_NOTE_CMD = "{\"name\":\"setnote\",\"description\":\"Set the note message\",\"options\":[{\"name\":\"message\",\"description\":\"Your note message\",\"type\":3,\"required\":true}]}";
 const String SET_ANIMATION_CMD = "{\"name\":\"setanimation\",\"description\":\"Set the frames of the animation\",\"options\":[{\"name\":\"delaytime\",\"description\":\"The time in milliseconds between each frame. 1000 equals 1 second.\",\"type\":4,\"required\":true},{\"name\":\"frame1\",\"description\":\"The first frame. Each frame should be max 32 characters long.\",\"type\":3,\"required\":true},{\"name\":\"frame2\",\"description\":\"The second frame. Following frames are optional.\",\"type\":3,\"required\":true},{\"name\":\"frame3\",\"description\":\"frame 3\",\"type\":3,\"required\":false},{\"name\":\"frame4\",\"description\":\"frame 4\",\"type\":3,\"required\":false},{\"name\":\"frame5\",\"description\":\"frame 5\",\"type\":3,\"required\":false},{\"name\":\"frame6\",\"description\":\"frame 6\",\"type\":3,\"required\":false},{\"name\":\"frame7\",\"description\":\"frame 7\",\"type\":3,\"required\":false},{\"name\":\"frame8\",\"description\":\"frame 8\",\"type\":3,\"required\":false},{\"name\":\"frame9\",\"description\":\"frame 9\",\"type\":3,\"required\":false},{\"name\":\"frame10\",\"description\":\"frame 10\",\"type\":3,\"required\":false},{\"name\":\"frame11\",\"description\":\"frame 11\",\"type\":3,\"required\":false},{\"name\":\"frame12\",\"description\":\"frame 12\",\"type\":3,\"required\":false},{\"name\":\"frame13\",\"description\":\"frame 13\",\"type\":3,\"required\":false},{\"name\":\"frame14\",\"description\":\"frame 14\",\"type\":3,\"required\":false},{\"name\":\"frame15\",\"description\":\"frame 15\",\"type\":3,\"required\":false},{\"name\":\"frame16\",\"description\":\"frame 16\",\"type\":3,\"required\":false},{\"name\":\"frame17\",\"description\":\"frame 17\",\"type\":3,\"required\":false},{\"name\":\"frame18\",\"description\":\"frame 18\",\"type\":3,\"required\":false},{\"name\":\"frame19\",\"description\":\"frame 19\",\"type\":3,\"required\":false},{\"name\":\"frame20\",\"description\":\"frame 20\",\"type\":3,\"required\":false},{\"name\":\"frame21\",\"description\":\"frame 21\",\"type\":3,\"required\":false},{\"name\":\"frame22\",\"description\":\"frame 22\",\"type\":3,\"required\":false},{\"name\":\"frame23\",\"description\":\"frame 23\",\"type\":3,\"required\":false},{\"name\":\"frame24\",\"description\":\"frame 24\",\"type\":3,\"required\":false}]}";
 const String SET_CUSTOMCHAR_CMD = "{\"name\":\"setcustomchar\",\"description\":\"Set a custom character\",\"options\":[{\"name\":\"slot\",\"description\":\"The slot where to save the character. Must be a value between 1 and 50.\",\"type\":4,\"required\":true},{\"name\":\"row1\",\"description\":\"The first pixel row of the character. This can be in DEC or HEX format.\",\"type\":3,\"required\":true},{\"name\":\"row2\",\"description\":\"row 2\",\"type\":3,\"required\":true},{\"name\":\"row3\",\"description\":\"row 3\",\"type\":3,\"required\":true},{\"name\":\"row4\",\"description\":\"row 4\",\"type\":3,\"required\":true},{\"name\":\"row5\",\"description\":\"row 5\",\"type\":3,\"required\":true},{\"name\":\"row6\",\"description\":\"row 6\",\"type\":3,\"required\":true},{\"name\":\"row7\",\"description\":\"row 7\",\"type\":3,\"required\":true},{\"name\":\"row8\",\"description\":\"row 8\",\"type\":3,\"required\":true},{\"name\":\"save\",\"description\":\"Save file to EEPROM? Default is false.\",\"type\":5,\"required\":false}]}";
-const String SET_MODE_CMD = "{\"name\":\"setmode\",\"description\":\"Set the main mode\",\"options\":[{\"name\":\"mode\",\"description\":\"The mode to switch to\",\"type\":4,\"required\":true,\"choices\":[{\"name\":\"Clock & Temp mode\",\"value\":0},{\"name\":\"Note mode\",\"value\":1},{\"name\":\"Stocks mode\",\"value\":2},{\"name\":\"Timer & Countdown mode\",\"value\":3},{\"name\":\"Animation mode\",\"value\":4}]}]}";
+const String SET_MODE_CMD = "{\"name\":\"setmode\",\"description\":\"Set the main mode\",\"options\":[{\"name\":\"mode\",\"description\":\"The mode to switch to\",\"type\":4,\"required\":true,\"choices\":[{\"name\":\"Clock & Temp mode\",\"value\":0},{\"name\":\"Note mode\",\"value\":1},{\"name\":\"Stocks mode\",\"value\":2},{\"name\":\"Timer & Countdown mode\",\"value\":3},{\"name\":\"Animation mode\",\"value\":4},{\"name\":\"3D viewer mode\",\"value\":5}]}]}";
 const String SET_LED_MODE_CMD = "{\"name\":\"setledmode\",\"description\":\"Set the main LED mode\",\"options\":[{\"name\":\"ledmode\",\"description\":\"The main led mode\",\"type\":4,\"required\":true,\"choices\":[{\"name\":\"Gentle flash\",\"value\":1},{\"name\":\"Fast flash\",\"value\":2},{\"name\":\"Fixed color\",\"value\":3},{\"name\":\"Rainbow\",\"value\":0},{\"name\":\"Off\",\"value\":4}]},{\"name\":\"ledcolor\",\"description\":\"The hex color to use for the led if using a flash or fixed color ledmode\",\"type\":3,\"required\":false}]}";
 const String SET_STOCK_CMD = "{\"name\":\"setstock\",\"description\":\"Set the stock\",\"options\":[{\"name\":\"stock\",\"description\":\"The stock to set\",\"type\":3,\"required\":true}]}";
 const String SET_TIMER_CMD = "{\"name\":\"settimer\",\"description\":\"Set the timer to timer-mode\"}";
 const String SET_COUNTDOWN_CMD = "{\"name\":\"setcountdown\",\"description\":\"Set the timer to countdown mode and specify target time\",\"options\":[{\"name\":\"hours\",\"description\":\"The hour of the target time\",\"type\":4,\"required\":true},{\"name\":\"minutes\",\"description\":\"The minutes of the target time\",\"type\":4,\"required\":true},{\"name\":\"seconds\",\"description\":\"The seconds of the target time\",\"type\":4,\"required\":true}]}";
 const String GET_CUSTOMCHAR_CMD = "{\"name\":\"getcustomchar\",\"description\":\"Show a character stored at the given slot\",\"options\":[{\"name\":\"slot\",\"description\":\"Must be a value between 1 and 50\",\"type\":4,\"required\":true},{\"name\":\"screencolor\",\"description\":\"The screen color to use for the return image\",\"type\":4,\"required\":false,\"choices\":[{\"name\":\"Blue\",\"value\":0},{\"name\":\"Green\",\"value\":1}]}]}";
 const String GET_SCREEN_CMD = "{\"name\":\"getscreen\",\"description\":\"Show what's on the screen right now\",\"options\":[{\"name\":\"screencolor\",\"description\":\"The screen color to use for the return image\",\"type\":4,\"required\":false,\"choices\":[{\"name\":\"Blue\",\"value\":0},{\"name\":\"Green\",\"value\":1}]}]}";
+const String SET_OBJ_CMD = "{\"name\":\"setobject\",\"description\":\"Set the 3D object and parameters\",\"options\":[{\"name\":\"objdata\",\"description\":\"The obj data as a string. Order should be v, f(if any), l(if any)\",\"type\":3,\"required\":true},{\"name\":\"pivot\",\"description\":\"The pivot vector. Use a space as seperator\",\"type\":3,\"required\":false},{\"name\":\"offset\",\"description\":\"The offset vector to apply to the mesh (and pivot)\",\"type\":3,\"required\":false},{\"name\":\"zoom\",\"description\":\"The camera zoom to apply\",\"type\":4,\"required\":false},{\"name\":\"rotationangle\",\"description\":\"The angle to rotate by every frame\",\"type\":4,\"required\":false}]}";
 
 //NOTIFICATION FIELDS
 String lastRemainingMessage = "";
@@ -535,8 +548,8 @@ String lastSeenMessage = ""; //keep track of what's shown on screen when showing
 String lastRemainingSystemMessage = "";
 bool showingNotification = false;
 bool showingSystemNotification = false;
-String currentNotificationIcon = "((51))";
-String currentSystemNotificationIcon ="((51))";
+String currentNotificationIcon = "((54))";
+String currentSystemNotificationIcon ="((54))";
 
 unsigned long timeSinceSystemNotification = 0;
 int currentNotificationLedMode = 0;
@@ -661,14 +674,6 @@ int yC = 0;
 unsigned long timeSince3DUpdate = 0;
 int angle3D = 0;
 float projectPlaneDistance = 1; 
-/*vector3 p1 = {-0.71, -0.71, 1.29};
-vector3 p2 = {-0.71, 0.71, 1.29};
-vector3 p3 = {0.71, 0.71, 1.29};
-vector3 p4 = {0.71, -0.71, 1.29};
-vector3 p5 = {-0.71, -0.71, 2.71};
-vector3 p6 = {-0.71, 0.71, 2.71};
-vector3 p7 = {0.71, 0.71, 2.71};
-vector3 p8 = {0.71, -0.71, 2.71};*/
 vector3 p1 = {-1, -1, 1};
 vector3 p2 = {-1, 1, 1};
 vector3 p3 = {1, 1, 1};
@@ -677,14 +682,47 @@ vector3 p5 = {-1, -1, -1};
 vector3 p6 = {-1, 1, -1};
 vector3 p7 = {1, 1, -1};
 vector3 p8 = {1, -1, -1};
-vector3 pivot = {0, 0, 0};
+vector3 pivot = {1, 0, 0};
 //eye distance to screen multiplied by zoom
-const float zNear = 15;
+float zNear = 30; //just zoom pretty much without getting closer to the object
+vector3 pivotPoint = {0,0,0};
+float rotationStep = 10;
 const int screenWidth = 24;
 const int screenHeight = 17;
 const int wHalf = screenWidth/2;
 const int hHalf = screenHeight/2;
-                          
+//array of vertices
+vector3 vertices[200] = {{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                        {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                        {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                        {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                        {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                        {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                        {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                        {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                        {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                        {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
+triangle faces[200] = {{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                        {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                        {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                        {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                        {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                        {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                        {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                        {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                        {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},
+                        {0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
+vector2 lines[200] = {{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},
+                      {0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},
+                      {0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},
+                      {0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},
+                      {0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},
+                      {0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},
+                      {0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0}};
+int facesCount = 0;
+int verticesCount = 0;
+int linesCount = 0;
+
 /*
  * Wifi & Discord related Methods
  */
@@ -817,7 +855,7 @@ void setup_commands()
     
     //add or update command
     //json_https_request("POST", host, GUILD_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"), GET_CUSTOMCHAR_CMD);
-    //json_https_request("POST", host, GUILD_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"), GET_SCREEN_CMD);
+    //json_https_request("POST", host, GUILD_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"),SET_MODE_CMD);
   
     //GLOBAL COMMANDS
     //remove exisiting command
@@ -842,8 +880,8 @@ void handleCommand()
         String ledColor = docLong["d"]["data"]["options"][2]["value"]; //may be null as its optional
         String message = docLong["d"]["data"]["options"][0]["value"];
 
-        int result = 0;
-        if (message[0] == '1') //system notification that requires button press //TODO temp for debugging
+        int result = createNotification(message, ledMode, ledColor, 0, false, false);
+        /*if (message[0] == '1') //system notification that requires button press //TODO temp for debugging
         {
             result = createNotification(message, ledMode, ledColor, 1, true, true);
         }
@@ -854,7 +892,7 @@ void handleCommand()
         else
         {
             result = createNotification(message, ledMode, ledColor, 0, false, false);
-        }
+        }*/
         
         if (result > 0)
         {
@@ -1191,6 +1229,63 @@ void handleCommand()
         
         commandValid = false; //we leave it false as we already handled response.
     }
+    else if (commandName == "setobject")
+    {
+        String objData = docLong["d"]["data"]["options"][0]["value"];
+        if (!parseObj(objData))
+        {
+            followUpCommand("Error: objData is invalid!");
+            return;
+        }
+
+        bool parseSuccess = true;
+        String pivotStr = docLong["d"]["data"]["options"][1]["value"];
+        pivotPoint = {0,0,0};
+        if (pivotStr != "null")
+        {
+            pivotPoint = parseVec3(pivotStr, parseSuccess);
+            if (!parseSuccess)
+            {
+                followUpCommand("Error: pivot vector is wrongly formatted!");
+                return;
+            }
+        }
+        
+        String offsetStr = docLong["d"]["data"]["options"][2]["value"];
+        vector3 offset = {0,0,0};
+        if (offsetStr != "null")
+        {
+            offset = parseVec3(offsetStr, parseSuccess);
+            if (!parseSuccess)
+            {
+                followUpCommand("Error: offset vector is wrongly formatted!");
+                return;
+            }
+        }
+
+        zNear = 30; //default
+        String zoomStr = docLong["d"]["data"]["options"][3]["value"];
+        if (zoomStr != "null")
+        {
+            zNear = docLong["d"]["data"]["options"][3]["value"];
+        }
+
+        rotationStep = 10;
+        String angleStr = docLong["d"]["data"]["options"][4]["value"];
+        if(angleStr != "null")
+        {
+            rotationStep = docLong["d"]["data"]["options"][4]["value"];
+        }
+    
+        //translate all vertices with offset
+        for (int i = 0; i < verticesCount; i++)
+        {
+            vertices[i] = translatePoint(vertices[i], offset);
+        }
+        pivotPoint = translatePoint(pivotPoint, offset); //also offset pivot
+        
+        commandValid = true;
+    }
     else if (commandName == "null")
     {
         followUpCommand("Error: command was 'null'. Perhaps the message is too long?");
@@ -1269,7 +1364,7 @@ int createNotification(String message, int ledMode, String ledColor, int notific
         switch(notificationIcon)
         {
             case 0:
-              currentSystemNotificationIcon = "((51))"; //bell
+              currentSystemNotificationIcon = "((54))"; //bell
               break;
             case 1:
               currentSystemNotificationIcon = "((52))"; //warning
@@ -1284,7 +1379,7 @@ int createNotification(String message, int ledMode, String ledColor, int notific
         switch(notificationIcon)
         {
             case 0:
-              currentNotificationIcon = "((51))"; //bell
+              currentNotificationIcon = "((54))"; //bell
               break;
             case 1:
               currentNotificationIcon = "((52))"; //warning
@@ -1693,77 +1788,45 @@ void handleAnimation()
 }
 
 //3D
+void setup3D() //default cube
+{
+    rotationStep = 10;
+    zNear = 30;
+    pivotPoint = {0, 0, 2.5}; //already offsetted pivotpoint
+    parseObj("v 1 0 1 v 1 0 0 v 1 1 0 v 1 1 1 v 0 0 1 v 0 0 0 v 0 1 0 v 0 1 1 l 1 2 l 2 3 l 3 4 l 4 1 l 5 6 l 6 7 l 7 8 l 8 5 l 1 5 l 2 6 l 3 7 l 4 8");
+    vector3 offset = {-0.5, -0.5, 2};
+
+    for (int i = 0; i < verticesCount; i++) //offset all vertices
+    {
+        vertices[i] = translatePoint(vertices[i], offset);
+    }
+}
+
 void handle3D()
 {
     if(millis() - timeSince3DUpdate >= 100) 
     {
         clearBuffer();
         timeSince3DUpdate = millis();
-        /*
-        setPixel(xC, yC);
-        xC++;
-        if(xC == 24)
+
+        //rotate all vertices
+        for(int i = 0; i < verticesCount; i++)
         {
-            yC++;
-            if(yC == 17)
-            {
-                yC = 0;
-                clearBuffer();
-            }
-            xC=0;
-        }*/
-        
-        //projected points
-        /*Serial.print("Original point: ");
-        Serial.print(p1.x);
-        Serial.print(", ");
-        Serial.print(p1.y);
-        Serial.print(", ");
-        Serial.print(p1.z);
-        Serial.print(" Projected point: ");
-        Serial.print(pp1.x);
-        Serial.print(", ");
-        Serial.println(pp1.y);*/
-        vector3 translation = {0,0,3}; //amount to move cube forward
-        vector3 translatedPivot = translatePoint(pivot, translation); //move cube pivot forward
-        //float m = 10; //multiplyfactor
-        //vector3 resizedPivot = multiplyVector3(pivot, m);
-        /*
-        vector2 pp1 = projectPoint(translatePoint(rotatePointAroundY(multiplyVector3(p1, m), angle3D, resizedPivot), translation));
-        vector2 pp2 = projectPoint(translatePoint(rotatePointAroundY(multiplyVector3(p2, m), angle3D, resizedPivot), translation));
-        vector2 pp3 = projectPoint(translatePoint(rotatePointAroundY(multiplyVector3(p3, m), angle3D, resizedPivot), translation));
-        vector2 pp4 = projectPoint(translatePoint(rotatePointAroundY(multiplyVector3(p4, m), angle3D, resizedPivot), translation));
-        vector2 pp5 = projectPoint(translatePoint(rotatePointAroundY(multiplyVector3(p5, m), angle3D, resizedPivot), translation));
-        vector2 pp6 = projectPoint(translatePoint(rotatePointAroundY(multiplyVector3(p6, m), angle3D, resizedPivot), translation));
-        vector2 pp7 = projectPoint(translatePoint(rotatePointAroundY(multiplyVector3(p7, m), angle3D, resizedPivot), translation));
-        vector2 pp8 = projectPoint(translatePoint(rotatePointAroundY(multiplyVector3(p8, m), angle3D, resizedPivot), translation));
-        */
-        vector2 pp1 = projectPoint(rotatePointAroundY(translatePoint(p1, translation), angle3D, translatedPivot));
-        vector2 pp2 = projectPoint(rotatePointAroundY(translatePoint(p2, translation), angle3D, translatedPivot));
-        vector2 pp3 = projectPoint(rotatePointAroundY(translatePoint(p3, translation), angle3D, translatedPivot));
-        vector2 pp4 = projectPoint(rotatePointAroundY(translatePoint(p4, translation), angle3D, translatedPivot));
-        vector2 pp5 = projectPoint(rotatePointAroundY(translatePoint(p5, translation), angle3D, translatedPivot));
-        vector2 pp6 = projectPoint(rotatePointAroundY(translatePoint(p6, translation), angle3D, translatedPivot));
-        vector2 pp7 = projectPoint(rotatePointAroundY(translatePoint(p7, translation), angle3D, translatedPivot));
-        vector2 pp8 = projectPoint(rotatePointAroundY(translatePoint(p8, translation), angle3D, translatedPivot));
-     
-        setLine(pp1.x, pp1.y, pp2.x, pp2.y);
-        setLine(pp2.x, pp2.y, pp3.x, pp3.y);
-        setLine(pp3.x, pp3.y, pp4.x, pp4.y);
-        setLine(pp4.x, pp4.y, pp1.x, pp1.y);
-        
-        setLine(pp5.x, pp5.y, pp6.x, pp6.y);
-        setLine(pp6.x, pp6.y, pp7.x, pp7.y);
-        setLine(pp7.x, pp7.y, pp8.x, pp8.y);
-        setLine(pp8.x, pp8.y, pp5.x, pp5.y);
+            vertices[i] = rotatePointAroundY(vertices[i], rotationStep, pivotPoint);
+        }
 
-        setLine(pp1.x, pp1.y, pp5.x, pp5.y);
-        setLine(pp2.x, pp2.y, pp6.x, pp6.y);
-        setLine(pp3.x, pp3.y, pp7.x, pp7.y);
-        setLine(pp4.x, pp4.y, pp8.x, pp8.y);
+        //draw all faces
+        for(int i = 0; i < facesCount; i++) 
+        {
+            drawFace(faces[i]);
+        }
 
-        angle3D += 10;
-        angle3D = angle3D%360;
+        //draw all lines
+        for (int i = 0; i < linesCount; i++)
+        {
+            draw3DLine(lines[i]);
+        }
+        
         bufferToScreen();
     }
 }
@@ -1772,17 +1835,9 @@ vector2 projectPoint(vector3 point)
 {
     if (abs(point.z) < 0.001f)
     {
-        Serial.print("Vector3: ");
-        Serial.print(point.toString());
-        Serial.println(" projected point: {0,0}");
         return (vector2){0,0};
     }
-    vector2 pp = (vector2){(zNear * point.x)/point.z + wHalf, (zNear * point.y)/point.z + hHalf};
-    //vector2 pp = (vector2){(point.x * (projectPlaneDistance / point.z)) + 12, (point.y * (projectPlaneDistance / point.z)) + 8};
-    Serial.print("Vector3: ");
-    Serial.print(point.toString());
-    Serial.print(" projected point: ");
-    Serial.println(pp.toString());
+    vector2 pp = (vector2){(zNear * point.x)/point.z + wHalf, hHalf - (zNear * point.y)/point.z};
     return pp;
 }
 
@@ -1797,7 +1852,7 @@ vector3 rotatePointAroundY(vector3 point, float angle, vector3 pivotPoint)
     
     //retranslate point so it's around pivot
     newPoint = translatePoint((vector3) { newX, newPoint.y, newZ }, pivotPoint);
-    return newPoint;//(vector3) { newX, point.y, newZ };
+    return newPoint;
 }
 
 vector3 translatePoint(vector3 point, vector3 translation)
@@ -1816,6 +1871,197 @@ vector3 multiplyVector3(vector3 vector, float multiplyFactor)
     return vector;
 }
 
+void draw3DLine(vector2 lineIndexes) //the vector2 contains vertices indexes
+{
+    vector2 pp1 = projectPoint(vertices[lineIndexes.x - 1]);
+    vector2 pp2 = projectPoint(vertices[lineIndexes.y - 1]);
+    setLine(pp1.x, pp1.y, pp2.x, pp2.y);
+}
+
+void drawFace(triangle tri)
+{
+    vector2 pp1 = projectPoint(vertices[tri.v1 - 1]); //-1 as wavefront obj doesn't use zero based indexing
+    vector2 pp2 = projectPoint(vertices[tri.v2 - 1]);
+    vector2 pp3 = projectPoint(vertices[tri.v3 - 1]);
+    
+    setLine(pp1.x, pp1.y, pp2.x, pp2.y);
+    setLine(pp2.x, pp2.y, pp3.x, pp3.y);
+    setLine(pp3.x, pp3.y, pp1.x, pp1.y);
+}
+
+vector3 parseVec3(String spaceSeperatedVector3, bool &success)
+{
+    vector3 vec = {0,0,0};
+    int spaceIndex = spaceSeperatedVector3.indexOf(' ');
+    if (spaceIndex == -1) 
+    {
+        success = false;
+        return vec;
+    }
+    vec.x = spaceSeperatedVector3.substring(0, spaceIndex).toFloat();
+    int newStart = spaceIndex + 1;
+    spaceIndex = spaceSeperatedVector3.indexOf(' ', newStart);
+    if (spaceIndex == -1) 
+    {
+        success = false;
+        return vec;
+    }
+    vec.y = spaceSeperatedVector3.substring(newStart, spaceIndex).toFloat();
+    newStart = spaceIndex + 1;
+    if (newStart >= spaceSeperatedVector3.length())
+    {
+        success = false;
+        return vec;
+    }
+    vec.z = spaceSeperatedVector3.substring(newStart, spaceSeperatedVector3.length()).toFloat();
+    success = true;
+    return vec;
+}
+
+bool parseObj(String objData)
+{    
+    int spaceIndex = 0; //used for splitting
+    int lastSpaceIndex = 0;
+    int countIndex = 0; //counts up
+    
+    //split vertices
+    int indexV = 0; //the index of where the vertex data starts
+    int indexEndV = 0;//the end of the vertex data(basically the index of the next v)
+    String vertexStr = "";
+    vector3 vertex = {0,0,0};
+    while(objData.indexOf('v') != -1)
+    {
+        indexV = objData.indexOf('v');
+        //look for next indexv
+        indexEndV = objData.indexOf('v', indexV+5); //+5 as every vertex is at LEAST 5 characters long
+        if (indexEndV == -1) //if no next v can be found, look for f (face) 
+        {
+            indexEndV = objData.indexOf('f', indexV+5);
+            if (indexEndV == -1) //no f can be found, look for l(line) instead
+            {
+                indexEndV = objData.indexOf('l', indexV+5);
+                if (indexEndV == -1) //no l can be found either
+                {
+                    return false; //parse unsuccessful
+                }
+            }
+        }
+
+        vertexStr = objData.substring(indexV+1, indexEndV);
+        vertexStr.trim();
+        
+        //split in 3 floats to get a vector3
+        spaceIndex = vertexStr.indexOf(' ');
+        if(spaceIndex == -1) return false; //parse unsuccesful
+        vertex.x = vertexStr.substring(0, spaceIndex).toFloat();
+        lastSpaceIndex = spaceIndex + 1;// +1 as we don't want to include the space
+        spaceIndex = vertexStr.indexOf(' ', lastSpaceIndex); 
+        if(spaceIndex == -1) return false; //parse unsuccesful
+        vertex.y = vertexStr.substring(lastSpaceIndex, spaceIndex).toFloat();
+        lastSpaceIndex = spaceIndex + 1;
+        vertex.z = vertexStr.substring(lastSpaceIndex, vertexStr.length()).toFloat();    
+          
+        //store vertex
+        vertices[countIndex] = vertex; 
+
+        //substring objData
+        objData = objData.substring(indexEndV);
+
+        countIndex++;
+    }
+    verticesCount = countIndex;
+    
+    //find and split faces
+    countIndex = 0;
+    int indexF = 0; //the index of where the face data starts
+    int indexEndF = 0;//the end of the face data(basically the index of the next f)
+    String faceStr = "";
+    triangle face = {0,0,0}; //ints
+    while(objData.indexOf('f') != -1)
+    {
+        indexF = objData.indexOf('f');
+        //look for next indexf
+        indexEndF = objData.indexOf('f', indexF+5); //+5 as every face is at LEAST 5 characters long
+        if (indexEndF == -1) //if no next f can be found look for l
+        {
+            indexEndF = objData.indexOf('l', indexF+5);
+            if (indexEndF == -1)
+            {
+                indexEndF = objData.length(); //no l found, just read till end of file
+            }
+        }
+
+        faceStr = objData.substring(indexF+1, indexEndF);
+        faceStr.trim();
+        
+        //split in 3 ints to get a triangle
+        spaceIndex = faceStr.indexOf(' ');
+        if(spaceIndex == -1) return false; //parse unsuccesful
+        face.v1 = faceStr.substring(0, spaceIndex).toInt();
+        lastSpaceIndex = spaceIndex + 1;// +1 as we don't want to include the space
+        spaceIndex = faceStr.indexOf(' ', lastSpaceIndex); 
+        if(spaceIndex == -1) return false; //parse unsuccesful
+        face.v2 = faceStr.substring(lastSpaceIndex, spaceIndex).toInt();
+        lastSpaceIndex = spaceIndex + 1;
+        face.v3 = faceStr.substring(lastSpaceIndex, faceStr.length()).toInt(); 
+        if(face.v1 < 0 || face.v2 < 0 || face.v3 < 0 || face.v1 > 200 || face.v2 > 200 || face.v3 > 200)
+        {
+            return false; //out of bounds   
+        }
+          
+        //store face
+        faces[countIndex] = face; 
+
+        //substring objData
+        objData = objData.substring(indexEndF);
+
+        countIndex++;
+    }
+    facesCount = countIndex; //track how many faces we need to draw
+
+    //find and split lines
+    countIndex = 0;
+    int indexL = 0; //the index of where the line data starts
+    int indexEndL = 0;//the end of the line data(basically the index of the next l)
+    String lineStr = "";
+    vector2 line = {0,0}; //ints, where each value represents index in vertices array
+    while(objData.indexOf('l') != -1)
+    {
+        indexL = objData.indexOf('l');
+        //look for next indexl
+        indexEndL = objData.indexOf('l', indexL+3); //+3 as every linee is at LEAST 3 characters long
+        if (indexEndL == -1) //if no next l can be found read till end of file
+        {
+            indexEndL = objData.length();
+        }
+
+        lineStr = objData.substring(indexL+1, indexEndL);
+        lineStr.trim();
+        
+        //split in 2 ints to get a vector
+        spaceIndex = lineStr.indexOf(' ');
+        if(spaceIndex == -1) return false; //parse unsuccesful
+        line.x = lineStr.substring(0, spaceIndex).toInt();
+        line.y = lineStr.substring(spaceIndex+1, lineStr.length()).toInt(); 
+        if(line.x < 0 || line.y < 0 || line.x > 200 || line.y > 200)
+        {
+            return false; //out of bounds   
+        }
+          
+        //store line
+        lines[countIndex] = line; 
+
+        //substring objData
+        objData = objData.substring(indexEndL);
+
+        countIndex++;
+    }
+    linesCount = countIndex; //track how many faces we need to draw
+    
+    return true; //parse was successful
+}
+
+//screen buffer
 void clearBuffer()
 {
     for (int i = 0; i < 51; i++)
@@ -1834,15 +2080,6 @@ void setPixel(int x, int y)
 
 void setLine(int x0, int y0, int x1, int y1)
 {  
-  /*
-    Serial.print("x0: ");
-    Serial.print(x0);
-    Serial.print(" y0: ");
-    Serial.print(y0);
-    Serial.print("x1: ");
-    Serial.print(x1);
-    Serial.print(" y1: ");
-    Serial.println(y1);*/
     float x = x0;
     float y = y0;
     
@@ -2626,6 +2863,7 @@ void setup()
     lastTemp = getTemp();
     getStock();
     getImgurAccessToken();
+    setup3D();
 }
 
 void loop()
