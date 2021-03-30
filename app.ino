@@ -8,10 +8,14 @@
 #include <WiFiClientSecure.h>
 #include "GatewayIntents.h"
 #include "WebSocketClient.h"
-#include "libs/ArduinoJson.h"
+//#include "libs/ArduinoJson.h"
 #include "time.h"
 #include "Passwords.h" //passwords, tokens & ids are defined here
 #include <EEPROM.h>
+#include <ESPAsyncWebServer.h>
+#include <ArduinoJson.h>
+#include <AsyncJson.h>
+#include <AsyncTCP.h>
 
 /*
  * All defines
@@ -167,6 +171,8 @@ void draw3DLine(vector2 lineIndexes);
 vector3 parseVec3(String spaceSeperatedVector3, bool &success);
 void setup3D();
 void setupEEPROM();
+void setupServer();
+void notFound(AsyncWebServerRequest *request);
 
 // Function to copy 'len' elements from 'src' to 'dst'
 void copy(const uint8_t* src, uint8_t* dst, int len) {
@@ -531,6 +537,8 @@ IPAddress gateway(192, 168, 2, 1); // Set your Gateway IP address
 IPAddress subnet(255, 255, 0, 0);
 IPAddress primaryDNS(8, 8, 8, 8);   //optional
 IPAddress secondaryDNS(8, 8, 4, 4); //optional
+//ASYNC WEB SERVER
+AsyncWebServer server(80);
 
 //DISCORD JSON COMMAND FIELDS
 const String NOTIFICATION_CMD = "{\"name\":\"notification\",\"description\":\"Send a notification to Disco\",\"options\":[{\"name\":\"message\",\"description\":\"Your notification message\",\"type\":3,\"required\":true},{\"name\":\"ledmode\",\"description\":\"The led mode to be in while your notification is displayed\",\"type\":4,\"required\":true,\"choices\":[{\"name\":\"Gentle flash\",\"value\":1},{\"name\":\"Fast flash\",\"value\":2},{\"name\":\"Fixed color\",\"value\":3},{\"name\":\"Rainbow\",\"value\":0},{\"name\":\"Off\",\"value\":4}]},{\"name\":\"ledcolor\",\"description\":\"The hex color to use for the led if using a flash or fixed color ledmode\",\"type\":3,\"required\":false}]}";
@@ -2340,6 +2348,92 @@ void setupEEPROM()
     }
 }
 
+//REST WEBSERVER
+void setupServer()
+{
+    /*
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) 
+    {
+        Serial.println("get / message called");
+        request->send(200, "application/json", "{\"message\":\"Welcome\"}");
+    });
+
+    server.on("/get-message", HTTP_GET, [](AsyncWebServerRequest *request) 
+    {
+        Serial.println("get message called");
+        StaticJsonDocument<100> data;
+        if (request->hasParam("message"))
+        {
+            data["message"] = request->getParam("message")->value();
+        }
+        else
+        {
+            data["message"] = "No message parameter";
+        }
+        String response;
+        serializeJson(data, response);
+        request->send(200, "application/json", response);
+    });
+    */
+
+    AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler("/notification", [](AsyncWebServerRequest *request, JsonVariant &json) 
+    {
+        //example input data:
+        //{ "message": "this is a notification ((42))",
+        //  "ledmode": 4,
+        //  "ledcolor": "FFFFFF" // --> optional
+        //}
+
+        StaticJsonDocument<1024> data;
+        if (json.is<JsonArray>())
+        {
+            data = json.as<JsonArray>();
+        }
+        else if (json.is<JsonObject>())
+        {
+            data = json.as<JsonObject>();
+        }
+
+        bool success = true;
+        String message = data["message"];
+        int ledMode = data["ledmode"];
+        String ledColor = data["ledcolor"];
+        if(message == "null")
+        {
+            success = false;
+        }
+        if (success)
+        {
+            int returnValue = createNotification(message, ledMode, ledColor, 1, true, true);
+            if (returnValue < 0)
+            {
+                success = false;
+            }
+        }
+
+        if (success)
+        {
+            String response;
+            serializeJson(data, response);
+            request->send(200, "application/json", response);
+        }
+        else
+        {
+            request->send(400, "application/json", "{\"message\":\"Bad request!\"}");
+        }
+        Serial.println(data.as<String>());
+        
+    });
+    server.addHandler(handler);
+
+    server.onNotFound(notFound);
+    server.begin(); //start server
+}
+
+void notFound(AsyncWebServerRequest *request)
+{
+    request->send(404, "application/json", "{\"message\":\"Not found\"}");
+}
 
 /*
  * RGB LED Methods
@@ -2874,6 +2968,7 @@ void setup()
     setup_led();
     setup_lcd();
     setup_wifi();
+    setupServer();
     setup_commands(); //Only call this when you need to update commands
     configTzTime(defaultTimeZone, ntpServer);
     lastTemp = getTemp();
