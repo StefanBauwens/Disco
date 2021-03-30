@@ -539,6 +539,10 @@ IPAddress primaryDNS(8, 8, 8, 8);   //optional
 IPAddress secondaryDNS(8, 8, 4, 4); //optional
 //ASYNC WEB SERVER
 AsyncWebServer server(80);
+bool createNotificationOnNextLoop = false;
+String webserverNotificationMessage = "";
+int webserverLedMode = 0;
+String webserverLedColor = "";
 
 //DISCORD JSON COMMAND FIELDS
 const String NOTIFICATION_CMD = "{\"name\":\"notification\",\"description\":\"Send a notification to Disco\",\"options\":[{\"name\":\"message\",\"description\":\"Your notification message\",\"type\":3,\"required\":true},{\"name\":\"ledmode\",\"description\":\"The led mode to be in while your notification is displayed\",\"type\":4,\"required\":true,\"choices\":[{\"name\":\"Gentle flash\",\"value\":1},{\"name\":\"Fast flash\",\"value\":2},{\"name\":\"Fixed color\",\"value\":3},{\"name\":\"Rainbow\",\"value\":0},{\"name\":\"Off\",\"value\":4}]},{\"name\":\"ledcolor\",\"description\":\"The hex color to use for the led if using a flash or fixed color ledmode\",\"type\":3,\"required\":false}]}";
@@ -2402,6 +2406,14 @@ void setupServer()
         {
             success = false;
         }
+
+        //wait till loop to create notification to fix async issues
+        createNotificationOnNextLoop = true;
+        webserverNotificationMessage = message;
+        webserverLedMode = ledMode;
+        webserverLedColor = ledColor;
+        
+        /*
         if (success)
         {
             int returnValue = createNotification(message, ledMode, ledColor, 1, true, true);
@@ -2409,7 +2421,7 @@ void setupServer()
             {
                 success = false;
             }
-        }
+        }*/
 
         if (success)
         {
@@ -2980,6 +2992,12 @@ void setup()
 
 void loop()
 {
+    if (createNotificationOnNextLoop) //handle creating notification from webrequest
+    {
+        createNotificationOnNextLoop = false;
+        createNotification(webserverNotificationMessage, webserverLedMode, webserverLedColor, 1, true, true);
+    }
+  
     check_pushbutton();
     handle_pending_notification();
     handleLedMode();
