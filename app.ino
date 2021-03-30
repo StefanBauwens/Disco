@@ -11,6 +11,7 @@
 #include "libs/ArduinoJson.h"
 #include "time.h"
 #include "Passwords.h" //passwords, tokens & ids are defined here
+#include <EEPROM.h>
 
 /*
  * All defines
@@ -68,6 +69,8 @@
 #define DEFAULT_FRAME_DELAY 1000
 #define DEFAULT_FRAME_ONE "++++++++++++++++++++++++++++++++"
 #define DEFAULT_FRAME_TWO "--------------------------------"
+//EEPROM
+#define EEPROM_SIZE 400 //8*50 custom chars
 
 /*
  * Structs
@@ -163,6 +166,7 @@ void drawFace(triangle tri);
 void draw3DLine(vector2 lineIndexes);
 vector3 parseVec3(String spaceSeperatedVector3, bool &success);
 void setup3D();
+void setupEEPROM();
 
 // Function to copy 'len' elements from 'src' to 'dst'
 void copy(const uint8_t* src, uint8_t* dst, int len) {
@@ -881,18 +885,6 @@ void handleCommand()
         String message = docLong["d"]["data"]["options"][0]["value"];
 
         int result = createNotification(message, ledMode, ledColor, 0, false, false);
-        /*if (message[0] == '1') //system notification that requires button press //TODO temp for debugging
-        {
-            result = createNotification(message, ledMode, ledColor, 1, true, true);
-        }
-        else if (message[0] == '2') //system notification that goes away by time //TODO temp for debugging
-        {
-            result = createNotification(message, ledMode, ledColor, 1, true, false);
-        }
-        else
-        {
-            result = createNotification(message, ledMode, ledColor, 0, false, false);
-        }*/
         
         if (result > 0)
         {
@@ -982,6 +974,19 @@ void handleCommand()
         }
         Serial.print("save to eeprom:");
         Serial.println(saveToEeprom);
+
+        if (saveToEeprom)
+        {
+            EEPROM.write((slotNr - 1) * 8, row1Data);
+            EEPROM.write((slotNr - 1) * 8 + 1, row2Data);
+            EEPROM.write((slotNr - 1) * 8 + 2, row3Data);
+            EEPROM.write((slotNr - 1) * 8 + 3, row4Data);
+            EEPROM.write((slotNr - 1) * 8 + 4, row5Data);
+            EEPROM.write((slotNr - 1) * 8 + 5, row6Data);
+            EEPROM.write((slotNr - 1) * 8 + 6, row7Data);
+            EEPROM.write((slotNr - 1) * 8 + 7, row8Data);
+            EEPROM.commit();
+        }
 
         //store the value in the customChars array
         customChars[(slotNr - 1)*8] = row1Data;
@@ -2202,7 +2207,6 @@ void bufferToScreen() //buffer2screen uses customchars set at slots 44 to 51
     lcdPrint("      ((48))((49))((50))((51))");
 }
 
-
 int mod(int x, int m)
 {
     return ((x%m)+m)%m;
@@ -2322,6 +2326,18 @@ void getImgurAccessToken()
     String imgurStr = general_https_request("POST", imgurHost, "/oauth2/token", "Content-Type: application/x-www-form-urlencoded\r\n", "grant_type=refresh_token&refresh_token=" IMGUR_STEFAN_REFRESH_TOKEN "&client_id=" IMGUR_CLIENT_ID "&client_secret=" IMGUR_CLIENT_SECRET);
     deserializeJson(generalDoc, imgurStr.substring(imgurStr.indexOf('{'), imgurStr.lastIndexOf('}')+1));
     STEFAN_ACCESS_TOKEN = generalDoc["access_token"].as<String>();
+}
+
+//EEPROM
+void setupEEPROM()
+{
+    EEPROM.begin(EEPROM_SIZE);
+    
+    //load all customchars
+    for (int i = 0; i < EEPROM_SIZE; i++)
+    {
+        customChars[i] = EEPROM.read(i);
+    }
 }
 
 
@@ -2864,6 +2880,7 @@ void setup()
     getStock();
     getImgurAccessToken();
     setup3D();
+    setupEEPROM();
 }
 
 void loop()
