@@ -557,6 +557,7 @@ const String SET_COUNTDOWN_CMD = "{\"name\":\"setcountdown\",\"description\":\"S
 const String GET_CUSTOMCHAR_CMD = "{\"name\":\"getcustomchar\",\"description\":\"Show a character stored at the given slot\",\"options\":[{\"name\":\"slot\",\"description\":\"Must be a value between 1 and 50\",\"type\":4,\"required\":true},{\"name\":\"screencolor\",\"description\":\"The screen color to use for the return image\",\"type\":4,\"required\":false,\"choices\":[{\"name\":\"Blue\",\"value\":0},{\"name\":\"Green\",\"value\":1}]}]}";
 const String GET_SCREEN_CMD = "{\"name\":\"getscreen\",\"description\":\"Show what's on the screen right now\",\"options\":[{\"name\":\"screencolor\",\"description\":\"The screen color to use for the return image\",\"type\":4,\"required\":false,\"choices\":[{\"name\":\"Blue\",\"value\":0},{\"name\":\"Green\",\"value\":1}]}]}";
 const String SET_OBJ_CMD = "{\"name\":\"setobject\",\"description\":\"Set the 3D object and parameters\",\"options\":[{\"name\":\"objdata\",\"description\":\"The obj data as a string. Order should be v, f(if any), l(if any)\",\"type\":3,\"required\":true},{\"name\":\"pivot\",\"description\":\"The pivot vector. Use a space as seperator\",\"type\":3,\"required\":false},{\"name\":\"offset\",\"description\":\"The offset vector to apply to the mesh (and pivot)\",\"type\":3,\"required\":false},{\"name\":\"zoom\",\"description\":\"The camera zoom to apply\",\"type\":4,\"required\":false},{\"name\":\"rotationangle\",\"description\":\"The angle to rotate by every frame\",\"type\":4,\"required\":false}]}";
+const String GET_IP_CMD = "{\"name\":\"getip\",\"description\":\"Get the local IP of Disco\"}";
 
 //NOTIFICATION FIELDS
 String lastRemainingMessage = "";
@@ -871,7 +872,7 @@ void setup_commands()
     
     //add or update command
     //json_https_request("POST", host, GUILD_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"), GET_CUSTOMCHAR_CMD);
-    //json_https_request("POST", host, GUILD_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"),SET_MODE_CMD);
+    //json_https_request("POST", host, GUILD_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"),GET_IP_CMD);
   
     //GLOBAL COMMANDS
     //remove exisiting command
@@ -1302,6 +1303,12 @@ void handleCommand()
         pivotPoint = translatePoint(pivotPoint, offset); //also offset pivot
         
         commandValid = true;
+    }
+    else if (commandName == "getip")
+    {
+        String response = "My IP address is " + WiFi.localIP().toString();
+        followUpCommand(response);
+        return;
     }
     else if (commandName == "null")
     {
