@@ -3,12 +3,10 @@
 #include <WiFi.h>
 #include <WiFiMulti.h>
 #include <HTTPClient.h>
-
 #include <HardwareSerial.h>
 #include <WiFiClientSecure.h>
 #include "GatewayIntents.h"
 #include "WebSocketClient.h"
-//#include "libs/ArduinoJson.h"
 #include "time.h"
 #include "Passwords.h" //passwords, tokens & ids are defined here
 #include <EEPROM.h>
@@ -41,7 +39,7 @@
 #define FOLLOWUP_ENDPOINT "/api/v8/webhooks/" APPLICATION_ID "/"
 #define COMMAND_ACK "{\"type\":5}" //basic acknowledgement of interaction
 #define POSITIVE_COMMAND_MESSAGE "Got it!"
-////LCD DEFINES
+//LCD DEFINES
 #define RS_PIN 22
 #define EN_PIN 23
 #define LCD_D4 21 
@@ -77,7 +75,7 @@
 #define EEPROM_SIZE 400 //8*50 custom chars
 
 /*
- * Structs
+ * Structs used for 3D
  */
 struct vector2
 {
@@ -143,7 +141,6 @@ void handleNote();
 void handleTimer();
 String millisToString(unsigned long millisec);
 void handleAnimation();
-//LCD wrapper & helper functions
 void lcdClear();
 void lcdSetCursor(int col, int row);
 void lcdPrint(String unformattedStr);
@@ -194,7 +191,7 @@ String virtualLCDBottom = "                                ";
 int virtualCursorCol = 0;
 int virtualCursorRow = 0;
 int customChar = 1; //0 is used by system
-byte customChars[440] = {0x0, 0x0, 0xa, 0x15,0x11,0xa, 0x4, 0x0, // ==((1)) empty heart  //440 == 8rows * 50 characters  + 5 extra characters (used for system) (40 = 8*5) 
+byte customChars[440] = {0x0, 0x0, 0xa, 0x15,0x11,0xa, 0x4, 0x0, // ==((1)) empty heart  //440 == 8rows * 50 characters  + 5 extra characters (used for system) (40 = 8*5) //First 400 bytes will be overwritten when reading EEPROM
                          0x0, 0x0, 0xa, 0x1f,0x1f,0xe, 0x4, 0x0, // ==((2)) full heart
                          0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
                          0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
@@ -257,8 +254,8 @@ byte virtualCGRAM[64] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, -0x1,  //copy of the
                          0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, -0x1,
                          0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, -0x1,
                          0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, -0x1,
-                         0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, -0x1}; //TODO test extra
-const byte virtualCGROM[256][8] = {{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
+                         0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, -0x1};
+const byte virtualCGROM[256][8] = {{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}, //All the characters data --> Used when generating bitmaps of the screen
                                   {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
                                   {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
                                   {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
@@ -514,14 +511,13 @@ const byte virtualCGROM[256][8] = {{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
                                   {0x00,0x04,0x00,0x1F,0x00,0x04,0x00,0x00},
                                   {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
                                   {0x1F,0x1F,0x1F,0x1F,0x1F,0x1F,0x1F,0x1F}};
-
 int customCharsUsed[7] = {0,0,0,0,0,0,0}; //tracks if a custom char has already been used since last clear
 
 //WIFI AND DISCORD FIELDS
 const uint16_t gateway_intents = 0;//GUILD_MESSAGES_INTENT | GUILD_MESSAGE_TYPING_INTENT | DIRECT_MESSAGES_INTENT; // Intent options can be found in GatewayIntents.h
 WebSocketClient ws(true);
-DynamicJsonDocument docLong(8192); 
-DynamicJsonDocument doc(1024);
+DynamicJsonDocument docLong(8192); //A longer doc to put the full json data into
+DynamicJsonDocument doc(1024); //A small doc to quickly check for interaction intent
 const char *host = "discord.com";
 const int httpsPort = 443;
 unsigned long heartbeatInterval = 0;
@@ -532,11 +528,7 @@ String websocketSessionId;
 bool hasReceivedWSSequence = false;
 unsigned long lastWebsocketSequence = 0;
 bool wasDisconnected = false;
-IPAddress local_IP(192, 168, 2, 43);// Set your Static IP address
-IPAddress gateway(192, 168, 2, 1); // Set your Gateway IP address
-IPAddress subnet(255, 255, 0, 0);
-IPAddress primaryDNS(8, 8, 8, 8);   //optional
-IPAddress secondaryDNS(8, 8, 4, 4); //optional
+
 //ASYNC WEB SERVER
 AsyncWebServer server(80);
 bool createNotificationOnNextLoop = false;
@@ -583,7 +575,7 @@ unsigned long timeSinceLastClockUpdate = 0;
 //CLOCK
 const char* ntpServer = "pool.ntp.org";
 const char* defaultTimeZone = "CET-1CEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00"; //TZ environment variable
-DynamicJsonDocument generalDoc(1024);
+DynamicJsonDocument generalDoc(1024); //json doc used for multiple uses
 //WEATHER
 const char *weatherHost = "api.openweathermap.org";
 unsigned long timeSinceWeatherUpdate = 0;
@@ -686,20 +678,10 @@ byte screenBuffer[51] = {0,0,0,
                          0,0,0,
                          0,0,0,
                          0,0,0}; //3 x 17 bytes wide as pixels are saved as bits --> 24 pixels wide x 17 high
-int xC = 0;
+int xC = 0; //screen coordinates
 int yC = 0;
 unsigned long timeSince3DUpdate = 0;
 int angle3D = 0;
-float projectPlaneDistance = 1; 
-vector3 p1 = {-1, -1, 1};
-vector3 p2 = {-1, 1, 1};
-vector3 p3 = {1, 1, 1};
-vector3 p4 = {1, -1, 1};
-vector3 p5 = {-1, -1, -1};
-vector3 p6 = {-1, 1, -1};
-vector3 p7 = {1, 1, -1};
-vector3 p8 = {1, -1, -1};
-vector3 pivot = {1, 0, 0};
 //eye distance to screen multiplied by zoom
 float zNear = 30; //just zoom pretty much without getting closer to the object
 vector3 pivotPoint = {0,0,0};
@@ -747,11 +729,6 @@ void setup_wifi()
 {
     delay(10);
     
-    // Configures static IP address
-    /*if (!WiFi.config(local_IP, gateway, subnet, primaryDNS, secondaryDNS)) {
-      Serial.println("STA Failed to configure");
-    }*/
-    
     // We start by connecting to a WiFi network
     Serial.println();
     Serial.print("Connecting to ");
@@ -762,7 +739,7 @@ void setup_wifi()
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");
-        createNotification("Connecting to  WIFI...", 1, "null", 1, true, false);
+        createNotification("Connecting to  WIFI...", 1, "null", 1, true, false); //creates a system notification that tells us we're connecting to wifi
     }
 
     Serial.println("");
@@ -771,7 +748,7 @@ void setup_wifi()
     Serial.println(WiFi.localIP());
 }
 
-String json_https_request(String requestType, const char *hostStr, String urlStr, String extraHeaderStr, String jsonStr)
+String json_https_request(String requestType, const char *hostStr, String urlStr, String extraHeaderStr, String jsonStr) //Perform a JSON HTTPS REQUEST
 {
     WiFiClientSecure httpsClient;
     int r=0; //retry counter
@@ -816,7 +793,7 @@ String json_https_request(String requestType, const char *hostStr, String urlStr
     return line;
 }
 
-String general_https_request(String requestType, const char *hostStr, String urlStr, String extraHeaderStr, String body) //TODO test
+String general_https_request(String requestType, const char *hostStr, String urlStr, String extraHeaderStr, String body) //Performs a more general HTTPS REQUEST
 {
     WiFiClientSecure httpsClient;
     int r=0; //retry counter
@@ -888,11 +865,8 @@ void handleCommand()
 {
     bool commandValid = false;
     String commandName = docLong["d"]["data"]["name"];
-    Serial.print("Commandname:");
-    Serial.println(commandName);
     if(commandName == "notification")
     {
-        Serial.println("Notification command detected");
         int ledMode = docLong["d"]["data"]["options"][1]["value"];
         String ledColor = docLong["d"]["data"]["options"][2]["value"]; //may be null as its optional
         String message = docLong["d"]["data"]["options"][0]["value"];
@@ -911,9 +885,8 @@ void handleCommand()
     }
     else if(commandName == "setnote")
     {
-        Serial.println("Setnote command detected");
         commandValid = true;
-        currentNote = docLong["d"]["data"]["options"][0]["value"].as<String>(); //TODO test
+        currentNote = docLong["d"]["data"]["options"][0]["value"].as<String>();
         if (!showingNotification && !showingSystemNotification)
         {
             lcdClear();
@@ -921,7 +894,6 @@ void handleCommand()
     }
     else if (commandName == "setanimation")
     {
-        Serial.println("SetAnimation command detected");
         int delayTimeTemp = docLong["d"]["data"]["options"][0]["value"];
         if (delayTimeTemp < 0)
         {
@@ -929,18 +901,14 @@ void handleCommand()
             return;
         }
         frameDelay = delayTimeTemp;
-
         frameCount =  docLong["d"]["data"]["options"].size() - 1; //-1 as first option is delay
-        
-        Serial.print("frame count:");
-        Serial.println(frameCount);
 
-        for (int i = 0; i < frameCount; i++) //TODO add check to make sure every frame is 32 characters long!!
+        for (int i = 0; i < frameCount; i++)
         {
             frames[i] = ""; //clear frame
             String singleFrame = docLong["d"]["data"]["options"][i + 1]["value"];
             int formattedLength = lcdLength(singleFrame);
-            if (formattedLength > 32)
+            if (formattedLength > 32) //make each frame 32 characters long exactly
             {
                 singleFrame = lcdSubstring(singleFrame,0, 32);
             }
@@ -985,8 +953,6 @@ void handleCommand()
         {
             saveToEeprom = docLong["d"]["data"]["options"][9]["value"];
         }
-        Serial.print("save to eeprom:");
-        Serial.println(saveToEeprom);
 
         if (saveToEeprom)
         {
@@ -1015,14 +981,12 @@ void handleCommand()
     }
     else if (commandName == "setmode")
     {
-        Serial.println("SetMode command detected");
         currentMode = docLong["d"]["data"]["options"][0]["value"];
         lcdClear();
         commandValid = true;
     }
     else if(commandName == "setledmode")
     {
-        Serial.println("SetLEDMode command detected");
         int ledMode = docLong["d"]["data"]["options"][0]["value"];
         String ledColor = docLong["d"]["data"]["options"][1]["value"]; //may be null as its optional
 
@@ -1113,8 +1077,6 @@ void handleCommand()
         String responseStr = general_https_request("POST", imgurHost, IMGUR_UPLOAD_ENDPOINT, String("Authorization: Bearer " + STEFAN_ACCESS_TOKEN + "\r\n"), bitmap); //WORKS yeah!
         deserializeJson(generalDoc, responseStr);
         String link = generalDoc["data"]["link"];
-        Serial.print("link:");
-        Serial.println(link);
 
         if (link == "null")
         {
@@ -1126,12 +1088,10 @@ void handleCommand()
         String interactionToken = docLong["d"]["token"];
         String url = FOLLOWUP_ENDPOINT + interactionToken;
         json_https_request("POST", host, url, "", "{\"content\": \"Here you go!\", \"embeds\":[{\"image\":{\"url\": \"" + link + "\"}}]}"); 
-        
-        commandValid = false; //we leave it false as we already handled response.
+        return;
     }
     else if (commandName == "getscreen")
     {
-        Serial.println("getScreen command called");
         //generate pixeldata
         String screenData = virtualLCDTop;
         byte address = 0;
@@ -1205,7 +1165,6 @@ void handleCommand()
                     for (int w = 0; w < 5; w++) //each character is 5 pixels wide + 1 border
                     {
                         bitWrite(screenImage[(yCoordinate-h) * 12 + (xCoordinate-w)/8], (7-(xCoordinate-w)%8), bitRead(character[h],w));  
-                        //bitWrite(screenImage[(23-(yCoordinate+h)) * 12 + (xCoordinate+w)/8], (xCoordinate+w)%8, bitRead(character[h],w));  
                     }
                 }
                 //add one pixel space after each pixel
@@ -1226,7 +1185,7 @@ void handleCommand()
         }
         
         //generate bitmap file
-        generateBitmapImage(screenImage, 96, 17, 2, useGreenTable); //we use a mutliple of 8 as we're working with pure bits. Resize factor = 1
+        generateBitmapImage(screenImage, 96, 17, 2, useGreenTable); //we use a mutliple of 8 as we're working with pure bits. Resize factor = 2
   
         //create imgur image
         String responseStr = general_https_request("POST", imgurHost, IMGUR_UPLOAD_ENDPOINT, String("Authorization: Bearer " + STEFAN_ACCESS_TOKEN + "\r\n"), bitmap); //WORKS yeah!
@@ -1235,7 +1194,6 @@ void handleCommand()
         
         if (link == "null")
         {
-            Serial.println("Link was null");
             followUpCommand("Error: invalid result from Imgur. Try again?");
             return;
         }
@@ -1244,8 +1202,7 @@ void handleCommand()
         String interactionToken = docLong["d"]["token"];
         String url = FOLLOWUP_ENDPOINT + interactionToken;
         json_https_request("POST", host, url, "", "{\"content\": \"Here you go!\", \"embeds\":[{\"image\":{\"url\": \"" + link + "\"}}]}"); 
-        
-        commandValid = false; //we leave it false as we already handled response.
+        return;
     }
     else if (commandName == "setobject")
     {
@@ -1445,7 +1402,6 @@ int createNotification(String message, int ledMode, String ledColor, int notific
 
 void sendRemainingNotificationMessage()
 {     
-    //re-assign first char to make sure it's correct
     lcdClear();
 
     if (showingSystemNotification)
@@ -1513,7 +1469,7 @@ void sendRemainingNotificationMessage()
 
 void handle_pending_notification()
 {
-    if (showingSystemNotification) //system notifcation are prioritised
+    if (showingSystemNotification) //system notifcation are prioritised above regular
     {
         if ((!systemNotificationRequiresButtonPressInsteadOfTime && (millis() - timeSinceSystemNotification >= SYSTEM_NOTIFICATION_DISPLAY_DURATION)) //if set time has passed
           || (systemNotificationRequiresButtonPressInsteadOfTime && !pushbuttonPressHandled)) //if button has been pressed
@@ -1536,7 +1492,6 @@ void handle_pending_notification()
                     sendRemainingNotificationMessage();
                     pushbuttonPressHandled = true;
                 }
-                //go back to previous mode
             }
             pushbuttonPressHandled = true;            
         }
@@ -1555,7 +1510,6 @@ void handle_pending_notification()
                 //notification may be dismissed and go back to previous mode
                 showingNotification = false;
                 lcdClear();  
-                //TODO go back to previous mode
             }       
             pushbuttonPressHandled = true;
         }
@@ -1567,7 +1521,7 @@ void handle_pending_notification()
  */
 void handleMode()
 {
-    if (currentMode != 3 && (showingNotification || showingSystemNotification)) //don't handle modes when showing notification, except in the case of timer
+    if (currentMode != 3 && (showingNotification || showingSystemNotification)) //don't handle modes when showing notification, except in the case of timer, we want it to run in the background
     {
         return;
     }
@@ -1596,7 +1550,7 @@ void handleMode()
 }
 
 //CLOCK
-void handleClock() //TODO also show if less than a minute but notification cleared the screen!
+void handleClock()
 {
     if (millis() - timeSinceLastClockUpdate >= CLOCK_UPDATE_TIME)
     {
@@ -1604,8 +1558,7 @@ void handleClock() //TODO also show if less than a minute but notification clear
 
         struct tm timeinfo;
         if(!getLocalTime(&timeinfo)){
-          Serial.println("Failed to obtain time");
-          return;
+            return; //failed to get time
         }
         char dateBuff[16];
         char timeBuff[16];
@@ -1798,15 +1751,8 @@ void handleAnimation()
         timeSinceLastFrameChange = millis();
         lcdClear();
         lcdPrint(lcdSubstring(frames[currentFrame], 0, 16)); //print top part of frame 
-        //lcdPrint(lcdSubstring(frames, currentFrame * 32, (currentFrame * 32) + 16)); //print top part of frame
         lcdSetCursor(0,1);
         lcdPrint(lcdSubstring(frames[currentFrame], 16, 32)); //print bottom part of frame 
-        //lcdPrint(lcdSubstring(frames,(currentFrame * 32) + 16, (currentFrame * 32) + 32)); //print bottom part of frame
-        
-        //lcd.clear();
-        //lcd.print(frames.substring(currentFrame * 32, (currentFrame * 32) + 16)); //print top part of frame
-        //lcd.setCursor(0,1);
-        //lcd.print(frames.substring((currentFrame * 32) + 16, (currentFrame * 32) + 32)); //print bottom part of frame
         currentFrame = (currentFrame+1)%frameCount;
     }
 }
@@ -1826,7 +1772,7 @@ void setup3D() //default cube
     }
 }
 
-void handle3D()
+void handle3D() //gets called every loop --> rotates the mesh/lines and show them to the screen
 {
     if(millis() - timeSince3DUpdate >= 100) 
     {
@@ -1855,7 +1801,7 @@ void handle3D()
     }
 }
 
-vector2 projectPoint(vector3 point)
+vector2 projectPoint(vector3 point) //convert a world space vector3 to screen space coordinates
 {
     if (abs(point.z) < 0.001f)
     {
@@ -1879,7 +1825,7 @@ vector3 rotatePointAroundY(vector3 point, float angle, vector3 pivotPoint)
     return newPoint;
 }
 
-vector3 translatePoint(vector3 point, vector3 translation)
+vector3 translatePoint(vector3 point, vector3 translation) 
 {
     point.x += translation.x;
     point.y += translation.y;
@@ -1913,7 +1859,7 @@ void drawFace(triangle tri)
     setLine(pp3.x, pp3.y, pp1.x, pp1.y);
 }
 
-vector3 parseVec3(String spaceSeperatedVector3, bool &success)
+vector3 parseVec3(String spaceSeperatedVector3, bool &success) //generates a vector3 from a string like "0 0 0"
 {
     vector3 vec = {0,0,0};
     int spaceIndex = spaceSeperatedVector3.indexOf(' ');
@@ -1942,7 +1888,7 @@ vector3 parseVec3(String spaceSeperatedVector3, bool &success)
     return vec;
 }
 
-bool parseObj(String objData)
+bool parseObj(String objData) //generates the vertices/triangles/line from string obj data --> note that this is BASIC OBJ only. It only supports v,f, and l(in that order only).
 {    
     int spaceIndex = 0; //used for splitting
     int lastSpaceIndex = 0;
@@ -2218,20 +2164,18 @@ void bufferToScreen() //buffer2screen uses customchars set at slots 44 to 51
     customCharsUsed[5] = 0;
     customCharsUsed[6] = 0;
     customChar = 1; //reset curstom character count
-    //customChar = 1;
-    //lcdClear(); //fixes it for now
     lcdSetCursor(0,0);
     lcdPrint("      ((44))((45))((46))((47))");
     lcdSetCursor(0,1);
     lcdPrint("      ((48))((49))((50))((51))");
 }
 
-int mod(int x, int m)
+int mod(int x, int m) //a better modulo
 {
     return ((x%m)+m)%m;
 }
 
-//BITMAP Code based from: https://stackoverflow.com/questions/2654480/writing-bmp-image-in-pure-c-c-without-other-libraries
+//BITMAP Code loosely based from: https://stackoverflow.com/questions/2654480/writing-bmp-image-in-pure-c-c-without-other-libraries
 void generateBitmapImage (byte imageData[], int width, int height, int resizeFactor, bool useGreenTable) //width and height must be a multiple of 8 as we're using bits! (2 colors only)
 {
     int widthInBytes = (width * resizeFactor) / 8;
@@ -2340,7 +2284,7 @@ unsigned char* createBitmapInfoHeader (int height, int width)
 }
 
 //IMGUR
-void getImgurAccessToken()
+void getImgurAccessToken() //using the refresh token we request an acces token
 {
     String imgurStr = general_https_request("POST", imgurHost, "/oauth2/token", "Content-Type: application/x-www-form-urlencoded\r\n", "grant_type=refresh_token&refresh_token=" IMGUR_STEFAN_REFRESH_TOKEN "&client_id=" IMGUR_CLIENT_ID "&client_secret=" IMGUR_CLIENT_SECRET);
     deserializeJson(generalDoc, imgurStr.substring(imgurStr.indexOf('{'), imgurStr.lastIndexOf('}')+1));
@@ -2362,6 +2306,7 @@ void setupEEPROM()
 //REST WEBSERVER
 void setupServer()
 {
+    //Get
     /*
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) 
     {
@@ -2387,6 +2332,7 @@ void setupServer()
     });
     */
 
+    //Gets called when a POST request is performed to LOCALIP/notification with a json passing the notification parameters (message, ledmode and ledcolor)
     AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler("/notification", [](AsyncWebServerRequest *request, JsonVariant &json) 
     {
         //example input data:
@@ -2414,22 +2360,12 @@ void setupServer()
             success = false;
         }
 
-        //wait till loop to create notification to fix async issues
+        //wait till loop before we create notification to prevent async issues
         createNotificationOnNextLoop = true;
         webserverNotificationMessage = message;
         webserverLedMode = ledMode;
         webserverLedColor = ledColor;
         
-        /*
-        if (success)
-        {
-            int returnValue = createNotification(message, ledMode, ledColor, 1, true, true);
-            if (returnValue < 0)
-            {
-                success = false;
-            }
-        }*/
-
         if (success)
         {
             String response;
@@ -2439,9 +2375,7 @@ void setupServer()
         else
         {
             request->send(400, "application/json", "{\"message\":\"Bad request!\"}");
-        }
-        Serial.println(data.as<String>());
-        
+        }        
     });
     server.addHandler(handler);
 
@@ -2525,7 +2459,7 @@ bool checkValidHex(String hex)
     return isValid;
 }
 
-void handleLedMode()
+void handleLedMode() //gets called every loop
 {
     int ledMode = currentLedMode;
     String ledColor = currentLedColor;
@@ -2628,7 +2562,7 @@ void ledRainbow(int delayTime)
     }
 }
 
-bool transitionTo(int targetR, int targetG, int targetB) //Transitions to a given color one step at a time. Returns true if already at transition position.
+bool transitionTo(int targetR, int targetG, int targetB) //Transitions to a given color one step at a time. Returns true if already at transition position. Used by ledRainbow
 {
     if (rainbowRed != targetR || rainbowGreen != targetG || rainbowBlue != targetB)
     {
@@ -2676,13 +2610,14 @@ void check_pushbutton()
 }
 
 /*
- * LCD methods
+ * LCD methods, which wrap all the lcd commands so I can create a virtual image of what's on the screen + it makes working with custom chars easier. You can use ((X)) to get a saved value.
  */
 void setup_lcd()
 {
     lcd.begin(16,2);
     lcdClear();
 }
+
 //LCD WRAPPER COMMANDS 
 void lcdClear()
 {
@@ -2733,7 +2668,7 @@ void lcdPrint(String unformattedStr)
     lcd.print(formattedString);
 }
 
-String lcdFormat(String unformattedStr) 
+String lcdFormat(String unformattedStr) //formats a string like "bla bla ((1))" to a string actually readable by the lcd : "bla bla \1". It also will store the customchar in the cgram if it isn't already. 
 {
     String formattedString = unformattedStr;
     formattedString.replace("(())", ""); //empty
@@ -2843,7 +2778,7 @@ String lcdFormat(String unformattedStr)
     return formattedString;
 }
 
-int lcdLength(String unformattedStr) //TODO
+int lcdLength(String unformattedStr) //get the formatted character length of an unformatted string, necessary when doing substrings.
 {
     unformattedStr.replace("(())", ""); //empty
 
@@ -2932,7 +2867,7 @@ String intToEscapeCharacter(int digit) //used for setting number to value for cu
     switch(digit)
     {
         case 0:
-            escapedStr = "\x08"; //foldback adress 8 == 0 https://forum.arduino.cc/index.php?topic=419812.0
+            escapedStr = "\x08"; //foldback adress 8 == 0 https://forum.arduino.cc/index.php?topic=419812.0 --> we use this as \0 causes issues with String
             break;
         case 1:
             escapedStr = "\1";
@@ -3013,9 +2948,7 @@ void loop()
     if (!ws.isConnected())
     {
         Serial.println("connecting");
-        // It technically should fetch url from discord.com/api/gateway
         ws.connect("gateway.discord.gg", "/?v=8&encoding=json", 443);
-        createNotification("Connecting...", 1, "null", 1, true, false);
         wasDisconnected = true;
     }
     else
@@ -3023,7 +2956,6 @@ void loop()
         if (wasDisconnected)
         {
             wasDisconnected = false;
-            createNotification("Connected!", 1, "null", 1, true, false);
         }
         unsigned long now = millis();
         if(heartbeatInterval > 0)
@@ -3032,12 +2964,12 @@ void loop()
             {
                 if(hasReceivedWSSequence)
                 {
-                    Serial.println("Send:: {\"op\":1,\"d\":" + String(lastWebsocketSequence, 10) + "}");
+                    //Serial.println("Send:: {\"op\":1,\"d\":" + String(lastWebsocketSequence, 10) + "}");
                     ws.send("{\"op\":1,\"d\":" + String(lastWebsocketSequence, 10) + "}");
                 }
                 else
                 {
-                    Serial.println("Send:: {\"op\":1,\"d\":null}");
+                    //Serial.println("Send:: {\"op\":1,\"d\":null}");
                     ws.send("{\"op\":1,\"d\":null}");
                 }
                 lastHeartbeatSend = now;
@@ -3078,16 +3010,6 @@ void loop()
                     websocketSessionId = doc["d"]["session_id"].as<String>();
                     hasWsSession = true;
                 }
-                
-                /*
-                if(doc["t"] == "MESSAGE_CREATE")
-                {
-                    Serial.println("Message:");
-                    String extract = doc["d"]["content"];
-                    Serial.println(extract);
-                    lcd.setCursor(0, 1);
-                    lcd.print(extract);
-                }*/
             }
             else if(doc["op"] == 9) // Connection invalid
             {
@@ -3105,12 +3027,12 @@ void loop()
 
                 if(hasWsSession)
                 {
-                    Serial.println("Send:: {\"op\":6,\"d\":{\"token\":\"" + String(BOT_TOKEN) + "\",\"session_id\":\"" + websocketSessionId + "\",\"seq\":\"" + String(lastWebsocketSequence, 10) + "\"}}");
+                    //Serial.println("Send:: {\"op\":6,\"d\":{\"token\":\"" + String(BOT_TOKEN) + "\",\"session_id\":\"" + websocketSessionId + "\",\"seq\":\"" + String(lastWebsocketSequence, 10) + "\"}}");
                     ws.send("{\"op\":6,\"d\":{\"token\":\"" + String(BOT_TOKEN) + "\",\"session_id\":\"" + websocketSessionId + "\",\"seq\":\"" + String(lastWebsocketSequence, 10) + "\"}}");
                 }
                 else
                 {
-                    Serial.println("Send:: {\"op\":2,\"d\":{\"token\":\"" + String(BOT_TOKEN) + "\",\"intents\":" + gateway_intents + ",\"properties\":{\"$os\":\"linux\",\"$browser\":\"ESP8266\",\"$device\":\"ESP8266\"},\"compress\":false,\"large_threshold\":250}}");
+                    //Serial.println("Send:: {\"op\":2,\"d\":{\"token\":\"" + String(BOT_TOKEN) + "\",\"intents\":" + gateway_intents + ",\"properties\":{\"$os\":\"linux\",\"$browser\":\"ESP8266\",\"$device\":\"ESP8266\"},\"compress\":false,\"large_threshold\":250}}");
                     ws.send("{\"op\":2,\"d\":{\"token\":\"" + String(BOT_TOKEN) + "\",\"intents\":" + gateway_intents + ",\"properties\":{\"$os\":\"linux\",\"$browser\":\"ESP8266\",\"$device\":\"ESP8266\"},\"compress\":false,\"large_threshold\":250}}");
                 }
 
