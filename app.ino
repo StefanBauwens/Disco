@@ -19,9 +19,9 @@
  * All defines
  */
 //LED DEFINES
-#define GREEN_LED 2
-#define BLUE_LED 4
-#define RED_LED 15
+#define GREEN_LED 23//2
+#define BLUE_LED 21//4
+#define RED_LED 19//15
 #define GREEN_CHANNEL 0
 #define BLUE_CHANNEL 1
 #define RED_CHANNEL 2
@@ -30,7 +30,7 @@
 #define FAST_FLASH_DELAY_TIME 250
 #define RAINBOW_DELAY_TIME 10
 //PUSHBUTTON DEFINES
-#define PUSHBUTTON_INPUT 13
+#define PUSHBUTTON_INPUT 35//13
 //DSCRD DEFINES
 #define GUILD_COMMAND_URL "/api/v8/applications/" APPLICATION_ID "/guilds/" GUILD_ID "/commands"
 #define GLOBAL_COMMAND_URL "/api/v8/applications/" APPLICATION_ID "/commands"
@@ -40,12 +40,12 @@
 #define COMMAND_ACK "{\"type\":5}" //basic acknowledgement of interaction
 #define POSITIVE_COMMAND_MESSAGE "Got it!"
 //LCD DEFINES
-#define RS_PIN 22
-#define EN_PIN 23
-#define LCD_D4 21 
-#define LCD_D5 19 //looks like a 13!
-#define LCD_D6 18
-#define LCD_D7 5
+#define RS_PIN 13//22
+#define EN_PIN 12//23
+#define LCD_D4 14//21 
+#define LCD_D5 27//19 //looks like a 13!
+#define LCD_D6 26//18
+#define LCD_D7 25//5
 //NOTIFICATION DEFINES
 #define SYSTEM_NOTIFICATION_DISPLAY_DURATION 5000 //5 seconds
 #define ARROW_ICON_STR "~"
@@ -2918,6 +2918,11 @@ int intArrayContains(int intArray[], int value)
 void setup()
 {
     Serial.begin(115200);
+    pinMode(36, INPUT); //connected to gnd
+    pinMode(22, INPUT); //connected to gnd
+    pinMode(33, OUTPUT);
+    digitalWrite(33, HIGH); //used to power LCD anode and pushbutton
+  
     setup_pushbutton();
     setup_led();
     setup_lcd();
