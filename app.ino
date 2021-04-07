@@ -8,7 +8,7 @@
 #include "GatewayIntents.h"
 #include "WebSocketClient.h"
 #include "time.h"
-#include "Passwords.h" //passwords, tokens & ids are defined here
+#include "PasswordsC.h" //passwords, tokens & ids are defined here
 #include <EEPROM.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
@@ -55,7 +55,6 @@
 #define DEFAULT_MODE 0
 //CLOCK
 #define CLOCK_UPDATE_TIME 5000 //every 5 seconds for now
-#define CITY_COUNTRY "Boechout, Belgium"
 #define OPEN_WEATHER_API_KEY "c408d3f777d8e4ad81fe4bfce26397e0"
 #define WEATHER_UPDATE_TIME 300000 //every 5 minutes
 //STOCKS
@@ -68,9 +67,9 @@
 #define TIMER_NOTIFICATION_COLOR "0000FF" //blue
 #define COUNTDOWN_DEFAULT_TARGET 15000 //3675000 //millis for 1 hour, 1 minute and 15 seconds
 //ANIMATION
-#define DEFAULT_FRAME_DELAY 1000
-#define DEFAULT_FRAME_ONE "++++++++++++++++++++++++++++++++"
-#define DEFAULT_FRAME_TWO "--------------------------------"
+#define DEFAULT_FRAME_DELAY 600
+#define DEFAULT_FRAME_ONE "((30))((31))((32))             ((33))((34))((35))"
+#define DEFAULT_FRAME_TWO "((36))((37))((38))             ((39))((40))((41))"
 //EEPROM
 #define EEPROM_SIZE 400 //8*50 custom chars
 
@@ -514,7 +513,7 @@ const byte virtualCGROM[256][8] = {{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}, //
 int customCharsUsed[7] = {0,0,0,0,0,0,0}; //tracks if a custom char has already been used since last clear
 
 //WIFI AND DISCORD FIELDS
-const uint16_t gateway_intents = 0;//GUILD_MESSAGES_INTENT | GUILD_MESSAGE_TYPING_INTENT | DIRECT_MESSAGES_INTENT; // Intent options can be found in GatewayIntents.h
+const uint16_t gateway_intents = GUILD_MESSAGES_INTENT | GUILD_MESSAGE_TYPING_INTENT | DIRECT_MESSAGES_INTENT; // Intent options can be found in GatewayIntents.h
 WebSocketClient ws(true);
 DynamicJsonDocument docLong(8192); //A longer doc to put the full json data into
 DynamicJsonDocument doc(1024); //A small doc to quickly check for interaction intent
@@ -528,6 +527,7 @@ String websocketSessionId;
 bool hasReceivedWSSequence = false;
 unsigned long lastWebsocketSequence = 0;
 bool wasDisconnected = false;
+bool interactionFailed = false;
 
 //ASYNC WEB SERVER
 AsyncWebServer server(80);
@@ -622,8 +622,8 @@ const int IMG_HEIGHT = 8; //
 const int IMG_WIDTH = 8; //5; use multitudes of 8 to avoid extra calculations
 unsigned char padding[3] = {0,0,0};
 const char colorTableGreen[] = {
-    0x73,0xB5,0x87,0,  /// color 0 BGR + reserved
-    0x38,0x3E,0x2F,0   /// color 1
+    0x33,0xE5,0xB8,0,  /// color 0 BGR + reserved //b8e533
+    0x35,0x5E,0x4D,0   /// color 1 //4d5e35
 };
 const char colorTableBlue[] = {
     0xF8,0x21,0x1E,0,
@@ -751,6 +751,7 @@ void setup_wifi()
 String json_https_request(String requestType, const char *hostStr, String urlStr, String extraHeaderStr, String jsonStr) //Perform a JSON HTTPS REQUEST
 {
     WiFiClientSecure httpsClient;
+    httpsClient.setInsecure();
     int r=0; //retry counter
     while((!httpsClient.connect(hostStr, httpsPort)) && (r < 30))
     {
@@ -762,10 +763,11 @@ String json_https_request(String requestType, const char *hostStr, String urlStr
     {
         Serial.println("Connection failed");
     }
+
     httpsClient.print(requestType + " " + urlStr + " HTTP/1.1\r\n" +
                 "Host: " + hostStr + "\r\n" +
                 extraHeaderStr +
-                "Accept: application/json" + "\r\n" +
+                /*"Accept: application/json" + "\r\n" +*/
                 "Content-Type: application/json" + "\r\n" +
                 "Content-Length: " + jsonStr.length() + "\r\n" +
                 "Connection: close\r\n\r\n" +
@@ -796,6 +798,7 @@ String json_https_request(String requestType, const char *hostStr, String urlStr
 String general_https_request(String requestType, const char *hostStr, String urlStr, String extraHeaderStr, String body) //Performs a more general HTTPS REQUEST
 {
     WiFiClientSecure httpsClient;
+    httpsClient.setInsecure();
     int r=0; //retry counter
     while((!httpsClient.connect(hostStr, httpsPort)) && (r < 30))
     {
@@ -857,7 +860,20 @@ void setup_commands()
     //json_https_request("DELETE", host, ENDPOINT, String("Authorization: Bot " +String(BOT_TOKEN) + "\r\n"), "{}");
   
     //add new or update command
-    //json_https_request("POST", host, GLOBAL_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"), RGB_COMMAND);
+    /*json_https_request("POST", host, GLOBAL_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"), NOTIFICATION_CMD);
+    json_https_request("POST", host, GLOBAL_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"), SET_NOTE_CMD);
+    json_https_request("POST", host, GLOBAL_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"), SET_ANIMATION_CMD);
+    json_https_request("POST", host, GLOBAL_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"), SET_CUSTOMCHAR_CMD);
+    json_https_request("POST", host, GLOBAL_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"), SET_MODE_CMD);
+    json_https_request("POST", host, GLOBAL_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"), SET_LED_MODE_CMD);
+    json_https_request("POST", host, GLOBAL_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"), SET_STOCK_CMD);
+    json_https_request("POST", host, GLOBAL_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"), SET_TIMER_CMD);
+    json_https_request("POST", host, GLOBAL_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"), SET_COUNTDOWN_CMD);
+    json_https_request("POST", host, GLOBAL_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"), GET_CUSTOMCHAR_CMD);
+    json_https_request("POST", host, GLOBAL_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"), GET_SCREEN_CMD);
+    json_https_request("POST", host, GLOBAL_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"), SET_OBJ_CMD);
+    json_https_request("POST", host, GLOBAL_COMMAND_URL, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n"), GET_IP_CMD);*/
+
 }
 
 //PROCESSES INTERACTION COMMANDS
@@ -1085,9 +1101,18 @@ void handleCommand()
         }
 
         //send a message with image attached
-        String interactionToken = docLong["d"]["token"];
-        String url = FOLLOWUP_ENDPOINT + interactionToken;
-        json_https_request("POST", host, url, "", "{\"content\": \"Here you go!\", \"embeds\":[{\"image\":{\"url\": \"" + link + "\"}}]}"); 
+        if (!interactionFailed)
+        {
+            String interactionToken = docLong["d"]["token"];
+            String url = FOLLOWUP_ENDPOINT + interactionToken;
+            json_https_request("POST", host, url, "", "{\"content\": \"Here you go!\", \"embeds\":[{\"image\":{\"url\": \"" + link + "\"}}]}"); 
+        }
+        else
+        {
+            String channelEndpoint = "/api/v8/channels/" + docLong["d"]["channel_id"].as<String>() + "/messages";
+            json_https_request("POST", host, channelEndpoint, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n") + "User-Agent: Diskette (http://some.url, V0.1)\r\n", "{\"content\": \"Here you go: " + link + "\", \"embeds\":[{\"image\":{\"url\": \"" + link + "\"}}]}");
+        }
+        
         return;
     }
     else if (commandName == "getscreen")
@@ -1199,9 +1224,17 @@ void handleCommand()
         }
 
         //send a message with image attached
-        String interactionToken = docLong["d"]["token"];
-        String url = FOLLOWUP_ENDPOINT + interactionToken;
-        json_https_request("POST", host, url, "", "{\"content\": \"Here you go!\", \"embeds\":[{\"image\":{\"url\": \"" + link + "\"}}]}"); 
+        if (!interactionFailed)
+        {
+            String interactionToken = docLong["d"]["token"];
+            String url = FOLLOWUP_ENDPOINT + interactionToken;
+            json_https_request("POST", host, url, "", "{\"content\": \"Here you go!\", \"embeds\":[{\"image\":{\"url\": \"" + link + "\"}}]}"); 
+        }
+        else
+        {
+            String channelEndpoint = "/api/v8/channels/" + docLong["d"]["channel_id"].as<String>() + "/messages";
+            json_https_request("POST", host, channelEndpoint, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n") + "User-Agent: Diskette (http://some.url, V0.1)\r\n", "{\"content\": \"Here you go: " + link + "\", \"embeds\":[{\"image\":{\"url\": \"" + link + "\"}}]}");
+        }
         return;
     }
     else if (commandName == "setobject")
@@ -1282,9 +1315,18 @@ void handleCommand()
 
 void followUpCommand(String message)
 {
-    String interactionToken = docLong["d"]["token"];
-    String url = FOLLOWUP_ENDPOINT + interactionToken;
-    json_https_request("POST", host, url, "", "{\"content\":\"" + message + "\"}");
+    if(!interactionFailed) //if interaction didn't fail just send normal response
+    {
+        String interactionToken = docLong["d"]["token"];
+        String url = FOLLOWUP_ENDPOINT + interactionToken;
+        json_https_request("POST", host, url, "", "{\"content\":\"" + message + "\"}");
+    }
+    else //send message as a unofficial response
+    {
+        //send a message response anyway
+        String channelEndpoint = "/api/v8/channels/" + docLong["d"]["channel_id"].as<String>() + "/messages";
+        json_https_request("POST", host, channelEndpoint, String("Authorization: Bot " + String(BOT_TOKEN) + "\r\n") + "User-Agent: Diskette (http://some.url, V0.1)\r\n", "{\"content\":\"" + message + "\"}");
+    }
 }
 
 //NOTIFICATION
@@ -1619,8 +1661,12 @@ void getStock()
 {
     String stocksStr = json_https_request("GET", yahooHost, "/v8/finance/chart/" + currentStock + "?interval=1mo&range=min", "", "{}");
     deserializeJson(generalDoc, stocksStr);
-    lastStockPrice = generalDoc["chart"]["result"][0]["meta"]["regularMarketPrice"];
-    previousStockClose = generalDoc["chart"]["result"][0]["meta"]["chartPreviousClose"];
+    float stock = generalDoc["chart"]["result"][0]["meta"]["regularMarketPrice"];
+    if (stock != 0) //should fix nan
+    {
+        lastStockPrice = stock;
+        previousStockClose = generalDoc["chart"]["result"][0]["meta"]["chartPreviousClose"];
+    }
 }
 
 //NOTE
@@ -1642,7 +1688,14 @@ void handleNote()
             noteBottom = lcdSubstring(currentNote,16, lcdLength(currentNote));
         }
     }
-    
+
+    customCharsUsed[0] = 0; //TODO test
+    customCharsUsed[1] = 0;
+    customCharsUsed[2] = 0;
+    customCharsUsed[3] = 0;
+    customCharsUsed[4] = 0;
+    customCharsUsed[5] = 0;
+    customCharsUsed[6] = 0;
     customChar = 1; //Set this so it doesn't keep counting up and resetting cgram
     lcdSetCursor(0,0);
     lcdPrint(noteTop);
@@ -2993,7 +3046,17 @@ void loop()
             deserializeJson(doc, msg); //we use a smaller doc(1024) to make it go fast
             if(doc["t"] == "INTERACTION_CREATE") //This has to happen ASAP so Discord doesn't dismiss the command.
             {
-                json_https_request("POST", host,INTERACTION_URL_A + doc["d"]["id"].as<String>() + "/" + doc["d"]["token"].as<String>() + INTERACTION_URL_B, "", COMMAND_ACK); //initial basic ack
+                String response = json_https_request("POST", host,INTERACTION_URL_A + doc["d"]["id"].as<String>() + "/" + doc["d"]["token"].as<String>() + INTERACTION_URL_B, "", COMMAND_ACK); //initial basic ack
+                if (response.indexOf("Unknown") > 0) //check for failed interaction
+                {
+                    interactionFailed = true;
+                }
+                else
+                {
+                    interactionFailed = false;
+                }
+                Serial.print("Failed interaction:");
+                Serial.println(interactionFailed);
             }
             Serial.println(msg);
             

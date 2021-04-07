@@ -1,7 +1,8 @@
 #ifndef WEBSOCKETCLIENT_H
 #define WEBSOCKETCLIENT_H
 
-#include <WiFiClient.h>
+//#include <WiFiClient.h>
+#include <WiFiClientSecure.h>
 
 class WebSocketClient {
 public:
@@ -25,13 +26,13 @@ public:
 private:
 	int timedRead();
 
-    void write(uint8_t data);
+  void write(uint8_t data);
     
-    void write(const char *str);
+  void write(const char *str);
 
 	String generateKey();
 
-	WiFiClient *client;
+	WiFiClientSecure *client;
 
 	String authorizationHeader = "";
 

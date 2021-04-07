@@ -17,10 +17,13 @@
 // #endif
 
 WebSocketClient::WebSocketClient(bool secure) {
-	if (secure)
+	//if (secure)
+  //{
 		this->client = new WiFiClientSecure;
-	else
-		this->client = new WiFiClient;
+    client->setInsecure();
+  //}
+	//else
+	//	this->client = new WiFiClient;
 }
 
 WebSocketClient::~WebSocketClient() {
@@ -51,7 +54,7 @@ void WebSocketClient::write(uint8_t data) {
 
 void WebSocketClient::write(const char *data) {
     if (client->connected())
-        client->write(data);
+        ((WiFiClient*)client)->write(data);
 }
 
 bool WebSocketClient::connect(String host, String path, int port) {
