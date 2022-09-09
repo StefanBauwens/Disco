@@ -1,7 +1,9 @@
 MIT License
 
 Copyright (c) 2014-2019 Benoit Blanchon (Arduino Json)
+
 Copyright (c) 2019 Tim Porritt (Discord WebSocket Client)
+
 Copyright (c) 2021 Stefan Bauwens (Disco)
 
 
