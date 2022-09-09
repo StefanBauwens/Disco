@@ -8,7 +8,7 @@
 #include "GatewayIntents.h"
 #include "WebSocketClient.h"
 #include "time.h"
-#include "PasswordsC.h" //passwords, tokens & ids are defined here
+#include "Passwords.h" //passwords, tokens & ids are defined here
 #include <EEPROM.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
@@ -55,7 +55,6 @@
 #define DEFAULT_MODE 0
 //CLOCK
 #define CLOCK_UPDATE_TIME 5000 //every 5 seconds for now
-#define OPEN_WEATHER_API_KEY "c408d3f777d8e4ad81fe4bfce26397e0"
 #define WEATHER_UPDATE_TIME 300000 //every 5 minutes
 //STOCKS
 #define DEFAULT_STOCK "GME"
@@ -569,7 +568,7 @@ bool systemNotificationRequiresButtonPressInsteadOfTime = false;
 
 //MAIN MODE FIELDS
 String currentLedColor = "FFFFFF";
-int currentLedMode = 3;
+int currentLedMode = 4;
 int currentMode = DEFAULT_MODE;
 unsigned long timeSinceLastClockUpdate = 0;
 //CLOCK
@@ -658,7 +657,7 @@ byte screenImage[17*12] = {0,0,0,0,0,0,0,0,0,0,0,0, //used for screen. Pixels ar
 String bitmap = "";
 const char *imgurHost = "api.imgur.com";
 String IMGUR_UPLOAD_ENDPOINT = "/3/image";
-String STEFAN_ACCESS_TOKEN = ""; //retrieved with refresh token
+String IMGUR_ACCESS_TOKEN = ""; //retrieved with refresh token
 
 //3D FIELDS
 byte screenBuffer[51] = {0,0,0,
@@ -1090,7 +1089,7 @@ void handleCommand()
         generateBitmapImage(image, 8, 8, 4, useGreenTable); //we use a mutliple of 8 as we're working with pure bits. Resize factor = 4
 
         //create imgur image
-        String responseStr = general_https_request("POST", imgurHost, IMGUR_UPLOAD_ENDPOINT, String("Authorization: Bearer " + STEFAN_ACCESS_TOKEN + "\r\n"), bitmap); //WORKS yeah!
+        String responseStr = general_https_request("POST", imgurHost, IMGUR_UPLOAD_ENDPOINT, String("Authorization: Bearer " + IMGUR_ACCESS_TOKEN + "\r\n"), bitmap); //WORKS yeah!
         deserializeJson(generalDoc, responseStr);
         String link = generalDoc["data"]["link"];
 
@@ -1213,7 +1212,7 @@ void handleCommand()
         generateBitmapImage(screenImage, 96, 17, 2, useGreenTable); //we use a mutliple of 8 as we're working with pure bits. Resize factor = 2
   
         //create imgur image
-        String responseStr = general_https_request("POST", imgurHost, IMGUR_UPLOAD_ENDPOINT, String("Authorization: Bearer " + STEFAN_ACCESS_TOKEN + "\r\n"), bitmap); //WORKS yeah!
+        String responseStr = general_https_request("POST", imgurHost, IMGUR_UPLOAD_ENDPOINT, String("Authorization: Bearer " + IMGUR_ACCESS_TOKEN + "\r\n"), bitmap); //WORKS yeah!
         deserializeJson(generalDoc, responseStr);
         String link = generalDoc["data"]["link"];
         
@@ -2339,9 +2338,9 @@ unsigned char* createBitmapInfoHeader (int height, int width)
 //IMGUR
 void getImgurAccessToken() //using the refresh token we request an acces token
 {
-    String imgurStr = general_https_request("POST", imgurHost, "/oauth2/token", "Content-Type: application/x-www-form-urlencoded\r\n", "grant_type=refresh_token&refresh_token=" IMGUR_STEFAN_REFRESH_TOKEN "&client_id=" IMGUR_CLIENT_ID "&client_secret=" IMGUR_CLIENT_SECRET);
+    String imgurStr = general_https_request("POST", imgurHost, "/oauth2/token", "Content-Type: application/x-www-form-urlencoded\r\n", "grant_type=refresh_token&refresh_token=" IMGUR_REFRESH_TOKEN "&client_id=" IMGUR_CLIENT_ID "&client_secret=" IMGUR_CLIENT_SECRET);
     deserializeJson(generalDoc, imgurStr.substring(imgurStr.indexOf('{'), imgurStr.lastIndexOf('}')+1));
-    STEFAN_ACCESS_TOKEN = generalDoc["access_token"].as<String>();
+    IMGUR_ACCESS_TOKEN = generalDoc["access_token"].as<String>();
 }
 
 //EEPROM

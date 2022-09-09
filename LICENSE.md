@@ -1,6 +1,9 @@
 MIT License
 
-Copyright (c) 2019 Tim Porritt
+Copyright (c) 2014-2019 Benoit Blanchon (Arduino Json)
+Copyright (c) 2019 Tim Porritt (Discord WebSocket Client)
+Copyright (c) 2021 Stefan Bauwens (Disco)
+
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
