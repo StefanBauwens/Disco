@@ -1,4 +1,4 @@
-v# Disco : A freeform electronic desk toy
+# Disco : A freeform electronic desk toy
 
 Disco is a advanced desktop "toy" which can be controlled via a Discord bot.
 It consists of a 16x2 LCD, a single pushbutton and an RGB LED all controlled by a NodeMCU ESP32.
@@ -31,14 +31,14 @@ The options are:
 |`Note mode`|![LCD screenshot of note mode](readme%20images/note.png)| Simple mode which displays the last note set with the `setnote` command|
 |`Stocks mode`|![LCD screenshot of stocks mode](readme%20images/stocks.png)| This mode shows you the stock price and the growth percentage compared to the previous day. The stock displayed is set using the `setstock` command. The numbers are updated every 30 seconds|
 |`Timer & Countdown mode`|![LCD screenshot of timer & countdown mode](readme%20images/countdown.png)| When you're in this mode you can set a timer with the `settimer` command or a countdown with the `setcountdown` command. Pressing the pushbutton will start/reset the clock. If a countdown reaches 0 the LED will flash and display a notification until dismissed|
-|`Animation mode`|![LCD moving GIF of animation mode](readme%20images/animation.gif)| Shows a looping animation of frames set with the `setanimation` command. Up to 24 frames are possible with custom characters|
-|`3D viewer mode`|![LCD moving GIF of rotating cube in 3D viewer mode](readme%20images/3Dcube.gif)| This mode shows a rotating 3D object using the center 8 character positions. This can be changed using the `setobject` command. Default is a rotating cube|
+|`Animation mode`|![LCD moving GIF of animation mode](readme%20images/animation.gif)| Shows a looping animation of frames set with the `setanimation` command. Up to 24 frames are possible and custom characters can be used|
+|`3D viewer mode`|![LCD moving GIF of rotating cube in 3D viewer mode](readme%20images/3Dcube.gif)| This mode shows a rotating 3D object using the center 8 character positions. A custom 3D model can be set using the `setobject` command. Default is a rotating cube|
 
 
 ### Set Led Mode
 ![Set Led Mode Discord bot command](readme%20images/setLedMode.png)
 
-This is used to set the state of the LED when there's no notification showing. The first parameter is the ledmode, a second optional parameter is the Hex color used for the flash and fixed color led modes. This Hex string must be given without a hashtag to be valid, for example: `ff0000` for red.
+This is used to set the state of the LED (when there's no notification showing). The first parameter is the ledmode, a second optional parameter is the hex color used for the flash and fixed color modes. This hex string must be given without a hashtag to be valid, for example: `ff0000` for red.
 
 The ledmodes are:
 |Mode|Example GIF|Description|
@@ -53,7 +53,7 @@ The ledmodes are:
 ### Set Custom Character
 ![Set Custom Character Discord bot command](readme%20images/setCustomChar.png)
 
-This interesting command allows you to save custom characters to a specific slot. There are 50 possible slots (1 - 50) in total. Using a tool like [this one](https://maxpromer.github.io/LCD-Character-Creator/) allow you to get the Hex data of a custom sprite. Each row of the sprite generates a Hex value such as `0x1F`. So to set a custom character, first fill in the slot, and then pass the Hex values for each of the 8 rows. It's import to use Hex or Decimal values since the command doesn't support binary values.
+This interesting command allows you to save custom characters to a specific slot. There are 50 possible slots (1 - 50) in total. Using a tool like [this one](https://maxpromer.github.io/LCD-Character-Creator/) allows you to get the hex data of a custom sprite. Each row of the sprite generates a hex value such as `0x1F`. So to set a custom character, first fill in the slot, and then pass the hex values for each of the 8 rows. It's important to only use hex or decimal values since the command doesn't support binary values.
 
 There is an optional Save parameter which lets you to save the character to the ESP's flash memory. This means that even if Disco loses power it will still store the custom characters.
 
@@ -65,27 +65,31 @@ The custom characters can be used using the format `((x))` where x is replaced w
 
 This command allows you to send a notification message to Disco. This message will temporarily interrupt the current mode until dismissed. If the message is longer than what can fit on the screen it will be split up into multiple pages. Pressing the pushbutton will skip through the pages and finally dismiss the message on the device.
 
-The ledmode parameter is a dropdown parameter allowing you to pick a led mode to go with the notification. There's a third optional parameter which allows you to specify the ledcolor in Hex. This works similar to the `/setledmode` command.
+The ledmode parameter is a dropdown parameter allowing you to pick a led mode to go with the notification. There's a third optional parameter which allows you to specify the ledcolor in hex. This works similar to the `/setledmode` command.
 
 Custom characters are possible using the `((x))` format. A maximum of 7 *different* custom characters are allowed per page.
+
+Example of a notification:
+
+![Notification example screenshot of Disco](readme%20images/notificationExample.png)
 
 
 ### Set Animation
 ![Set Animation Discord bot command](readme%20images/setAnimation.png)
 
-This command is used to set the frames for Animation mode. A minimum of 2 frames are required and a maximum of 24 frames are possible in total. A frame consists of maximum 32 characters. Custom characters can be used using the format `((x))`. A maxium of 7 *different* custom characters are allowed per frame, but it's perfectly possible to use 32 custom characters as long as the total number of different characters doesn't exceed 8 (per frame). It's also possible to more than 7 different characters if they're spread over different frames.
+This command is used to set the frames for Animation mode. A minimum of 2 frames are required and a maximum of 24 frames are possible in total. A frame consists of maximum 32 characters. Custom characters can be used using the `((x))` format. A maximum of 7 *different* custom characters are allowed per frame, which means it's still perfectly possible to use 32 custom characters as long as the total number of different characters doesn't exceed 7 (per frame). It's also possible to use more than 7 different custom characters if they're spread over different frames.
 
 
 ### Set Countdown
 ![Set Countdown Discord bot command](readme%20images/setCountdown.png)
 
-When in Timer & Countdown mode sets it to use a countdown with the set hours, minutes and seconds to countdown. It will start counting down after pressing the pushbutton.
+When in Timer & Countdown mode this command will set it to use a countdown with the set hours, minutes and seconds. It will start counting down after pressing the pushbutton.
 
 
 ### Set Timer
 ![Set Timer Discord bot command](readme%20images/setTimer.png)
 
-When in Timer & Countdown mode sets it to use a timer which will count up after pressing the pushbutton. 
+When in Timer & Countdown mode this command will set it to use a timer which will count up after pressing the pushbutton. 
 
 
 ### Set Note
@@ -139,7 +143,7 @@ Sending this to Disco would look something like this:
 This will return the local IP address of the ESP.
 This is useful since Disco runs a simple HTTP server allowing you to send notifications to it using a POST request. Using an app like Tasker would allow you to send phone notifications directly to Disco.
 
-The endpoint for the POST request should be `LOCALIP/notification` (where LOCALIP is replaced with the local IP address of your ESP) and the message body should have the following format:
+The endpoint for the POST request should be `LOCALIP/notification` (where LOCALIP is replaced with the local IP address of Disco) and the message body should have the following format:
 ```
 {
     "message": "This is a notification ((42))",
