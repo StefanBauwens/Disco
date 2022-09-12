@@ -3,9 +3,11 @@
 Disco is a advanced desktop "toy" which can be controlled via a Discord bot.
 It consists of a 16x2 LCD, a single pushbutton and an RGB LED all controlled by a NodeMCU ESP32.
 
-![Photo of Disco](readme%20images/thumb3.jpg)
-![Photo of Disco](readme%20images/thumb1.jpg)
-![Photo of Disco](readme%20images/thumb2.jpg)
+<p>
+  <img src="readme%20images/thumb3.jpg" width="33%" />
+  <img src="readme%20images/thumb1.jpg" width="33%" /> 
+  <img src="readme%20images/thumb2.jpg" width="33%" />
+</p>
 
 ## Schematic
 ![Schematic Disco](readme%20images/schematic.png)
