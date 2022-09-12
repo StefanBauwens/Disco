@@ -1,3 +1,5 @@
+//Copyright(c) 2021-2022 Stefan Bauwens
+
 #include <Arduino.h>
 #include <LiquidCrystal.h>
 #include <WiFi.h>
@@ -837,6 +839,9 @@ String general_https_request(String requestType, const char *hostStr, String url
     }
     Serial.println("==========");
     Serial.println("closing connection");
+
+    //make sure output is pure json
+    output = output.substring(output.indexOf('{'), output.lastIndexOf('}')+1);
     return output;
 }
 
@@ -1092,7 +1097,6 @@ void handleCommand()
         String responseStr = general_https_request("POST", imgurHost, IMGUR_UPLOAD_ENDPOINT, String("Authorization: Bearer " + IMGUR_ACCESS_TOKEN + "\r\n"), bitmap); //WORKS yeah!
         deserializeJson(generalDoc, responseStr);
         String link = generalDoc["data"]["link"];
-
         if (link == "null")
         {
             followUpCommand("Error: invalid result from Imgur. Try again?");
@@ -2338,9 +2342,13 @@ unsigned char* createBitmapInfoHeader (int height, int width)
 //IMGUR
 void getImgurAccessToken() //using the refresh token we request an acces token
 {
+    Serial.println("Getting imgur access token...");
     String imgurStr = general_https_request("POST", imgurHost, "/oauth2/token", "Content-Type: application/x-www-form-urlencoded\r\n", "grant_type=refresh_token&refresh_token=" IMGUR_REFRESH_TOKEN "&client_id=" IMGUR_CLIENT_ID "&client_secret=" IMGUR_CLIENT_SECRET);
     deserializeJson(generalDoc, imgurStr.substring(imgurStr.indexOf('{'), imgurStr.lastIndexOf('}')+1));
     IMGUR_ACCESS_TOKEN = generalDoc["access_token"].as<String>();
+
+    Serial.println("token:");
+    Serial.println(IMGUR_ACCESS_TOKEN);
 }
 
 //EEPROM
